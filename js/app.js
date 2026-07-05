@@ -47,6 +47,7 @@
   let lessonSession = null;
   let storySession = null;
   let convoSession = null;
+  let battleSession = null;
   let speechVoices = [];
   let traceCtx = null;
   let traceDrawing = false;
@@ -104,7 +105,7 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if(raw){
         const parsed = JSON.parse(raw);
-        parsed.version = parsed.version || '1.2.0';
+        parsed.version = parsed.version || '1.2.1';
         parsed.deviceId = parsed.deviceId || getDeviceId();
         parsed.updatedAt = parsed.updatedAt || new Date().toISOString();
         parsed.profiles = parsed.profiles || {};
@@ -115,7 +116,7 @@
         return parsed;
       }
     } catch(err){ console.warn('Could not load progress', err); }
-    return migrateLegacyState() || { version: '1.2.0', selectedProfileId: null, profiles: deepClone(DEFAULT_PROFILES), updatedAt: new Date().toISOString(), deviceId: getDeviceId() };
+    return migrateLegacyState() || { version: '1.2.1', selectedProfileId: null, profiles: deepClone(DEFAULT_PROFILES), updatedAt: new Date().toISOString(), deviceId: getDeviceId() };
   }
 
   function mergeProgress(p){
@@ -136,7 +137,7 @@
 
   function saveState(options={}){
     try {
-      state.version = '1.2.0';
+      state.version = '1.2.1';
       state.updatedAt = new Date().toISOString();
       state.deviceId = state.deviceId || getDeviceId();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -180,7 +181,7 @@
             <div class="logo-lockup">
               <div class="logo punjabi">ਪ</div>
               <div>
-                <div class="eyebrow">Punjabi Quest v1.2 · Guided by Papa Ji</div>
+                <div class="eyebrow">Punjabi Quest v1.2.1 · Guided by Papa Ji</div>
                 <h1>Choose your player</h1>
                 <p class="muted">Read, speak, listen, earn XP, and build Punjabi power.</p>
               </div>
@@ -201,7 +202,7 @@
             `).join('')}
           </div>
           <div class="panel" style="margin-top:18px;background:#f7fff2;box-shadow:none;">
-            <strong>Parent note:</strong> Ages are not displayed anywhere in the app. Cloud sync is available after Firebase setup and parent email login.
+            <strong>Parent note:</strong> Ages are not displayed anywhere in the app. Cloud sync is available after Firebase setup and parent login with Google or email/password.
           </div>
           <div class="cloud-card" style="margin-top:14px">
             <div><strong>☁️ Cloud sync:</strong> ${cloudStatusText()}</div>
@@ -281,6 +282,7 @@
         ${tabButton('alphabet','🔤','Letters')}
         ${tabButton('stories','📚','Stories')}
         ${tabButton('speak','🗣️','Speak')}
+        ${tabButton('battle','☬','Battle')}
         ${tabButton('parent','📊','Parent')}
       </nav>`;
     APP.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => { activeTab = btn.dataset.tab; renderCurrentTab(); }));
@@ -301,6 +303,7 @@
     if(activeTab === 'alphabet') renderAlphabet(main);
     if(activeTab === 'stories') renderStories(main);
     if(activeTab === 'speak') renderSpeak(main);
+    if(activeTab === 'battle') renderBattle(main);
     if(activeTab === 'parent') renderParent(main);
   }
 
@@ -918,6 +921,258 @@
     convoSession=null; toast('Conversation complete: +25 XP'); activeTab='speak'; renderApp();
   }
 
+
+  function renderBattle(main){
+    if(!cloud.configured){
+      main.innerHTML = `<section class="hero-card"><div class="eyebrow">Live Battle Mode</div><h1>☬ Battle Mode needs Firebase</h1><p class="muted">Live battles use Firebase cloud sync so two devices can see the same scoreboard in real time.</p><div class="button-row"><button class="btn primary" data-cloud-login>Parent login</button></div></section>`;
+      main.querySelector('[data-cloud-login]').addEventListener('click', showCloudLoginModal);
+      return;
+    }
+    if(!cloud.user){
+      main.innerHTML = `<section class="hero battle-hero"><div class="hero-card"><div class="eyebrow">Live Battle Mode</div><h1>☬ Sign in to start a family battle</h1><p class="muted">Sujaan and Guntaas can compete from two different devices. Scores update live through Firebase.</p>${papaInlineHtml('guide', 'Papa Ji says: sign in with the parent account first, then create or join a battle code.') }<div class="button-row"><button class="btn primary big" data-cloud-login>Parent login</button></div></div><div class="battle-symbol-card"><div class="battle-symbols"><span>☬</span><span>🛡️</span><span>⚔️</span></div><h3>Khanda Shield Challenge</h3><p class="muted">Correct answer: +1. Incorrect answer: -1. First to 10 wins.</p></div></section>`;
+      main.querySelector('[data-cloud-login]').addEventListener('click', showCloudLoginModal);
+      return;
+    }
+    if(battleSession?.data){ renderBattleMatch(main); return; }
+    if(battleSession?.code && !battleSession?.data){
+      main.innerHTML = `<section class="hero-card"><div class="eyebrow">Live Battle Mode</div><h1>Loading battle ${h(battleSession.code)}...</h1><p class="muted">Waiting for Firebase.</p></section>`;
+      return;
+    }
+    main.innerHTML = `<section class="hero battle-hero">
+      <div class="hero-card">
+        <div class="eyebrow">Live Battle Mode</div>
+        <h1>☬ Khanda Shield Challenge</h1>
+        <p class="muted">Two players join the same live match from two devices. Each player gets questions matched to their own progress, but both compete on one scoreboard.</p>
+        ${papaInlineHtml('guide', `${activeProfile.name} is ready. Create a match on one device, then join with the same code on the second device.`)}
+        <div class="battle-rules">
+          <span>✅ Correct: +1</span><span>💪 Incorrect: -1</span><span>🏆 First to 10 wins</span>
+        </div>
+        <div class="button-row"><button class="btn primary big" data-battle-create>Create battle</button><button class="btn secondary big" data-battle-refresh>Refresh</button></div>
+      </div>
+      <div class="battle-symbol-card">
+        <div class="battle-symbols"><span>☬</span><span>🛡️</span><span>⚔️</span></div>
+        <h3>Join a battle</h3>
+        <p class="muted">Type the code from the other device.</p>
+        <input class="text-input battle-code-input" id="battleCodeInput" maxlength="6" placeholder="Battle code" />
+        <button class="btn mango big" style="width:100%;margin-top:10px" data-battle-join>Join battle</button>
+      </div>
+    </section>
+    <section class="panel"><h2>Respectful battle energy</h2><p class="muted">The kirpan, khanda, and shield graphics are used as respectful Sikh-inspired symbols of courage, learning, and protection. Battle Mode is friendly competition only.</p></section>`;
+    main.querySelector('[data-battle-create]').addEventListener('click', createBattleMatch);
+    main.querySelector('[data-battle-join]').addEventListener('click', () => joinBattleMatch(document.getElementById('battleCodeInput')?.value || ''));
+    main.querySelector('[data-battle-refresh]').addEventListener('click', () => renderBattle(main));
+  }
+
+  function battlePlayerInfo(){
+    return { id: activeProfile.id, name: activeProfile.name, avatar: activeProfile.avatar, className: activeProfile.className || '', deviceId: state.deviceId || getDeviceId(), joinedAt: new Date().toISOString(), lessonCount: activeProfile.progress.completedLessons.length };
+  }
+
+  function makeBattleCode(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let out = '';
+    for(let i=0;i<5;i++) out += chars[Math.floor(Math.random()*chars.length)];
+    return out;
+  }
+
+  async function createBattleMatch(){
+    if(!cloud.user || !cloud.db){ showCloudLoginModal(); return; }
+    const code = makeBattleCode();
+    const ref = cloudDocRef().collection('battles').doc(code);
+    const pid = activeProfile.id;
+    const data = { code, status:'waiting', targetScore:10, createdBy: state.deviceId || getDeviceId(), createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp(), players:{}, scores:{}, winner:null, winnerName:null, lastAnswer:null, theme:'khanda-shield' };
+    data.players[pid] = battlePlayerInfo();
+    data.scores[pid] = 0;
+    try { await ref.set(data, {merge:true}); openBattleSession(code); toast(`Battle created: ${code}`); }
+    catch(err){ console.warn(err); toast('Could not create battle. Check Firestore rules.'); }
+  }
+
+  async function joinBattleMatch(rawCode){
+    if(!cloud.user || !cloud.db){ showCloudLoginModal(); return; }
+    const code = String(rawCode || '').trim().toUpperCase();
+    if(!code){ toast('Enter a battle code.'); return; }
+    const ref = cloudDocRef().collection('battles').doc(code);
+    const pid = activeProfile.id;
+    try {
+      await cloud.db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw new Error('missing-battle');
+        const data = snap.data() || {};
+        if(data.status === 'complete') throw new Error('battle-complete');
+        const players = Object.assign({}, data.players || {});
+        const scores = Object.assign({}, data.scores || {});
+        const existingIds = Object.keys(players);
+        if(!players[pid] && existingIds.length >= 2) throw new Error('battle-full');
+        players[pid] = battlePlayerInfo();
+        if(scores[pid] == null) scores[pid] = 0;
+        const status = Object.keys(players).length >= 2 ? 'active' : 'waiting';
+        tx.set(ref, {players, scores, status, updatedAt:firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
+      });
+      openBattleSession(code); toast(`Joined battle ${code}`);
+    } catch(err){
+      const msg = String(err?.message || '');
+      if(msg.includes('missing-battle')) toast('No battle found with that code.');
+      else if(msg.includes('battle-full')) toast('That battle already has two players.');
+      else if(msg.includes('battle-complete')) toast('That battle already finished. Start a rematch.');
+      else { console.warn(err); toast('Could not join battle. Check Firestore rules.'); }
+    }
+  }
+
+  function openBattleSession(code){
+    if(battleSession?.unsubscribe) battleSession.unsubscribe();
+    const ref = cloudDocRef().collection('battles').doc(code);
+    battleSession = { code, ref, data:null, currentQuestion:null, locked:false, unsubscribe:null };
+    battleSession.unsubscribe = ref.onSnapshot(snap => {
+      battleSession.data = snap.exists ? snap.data() : null;
+      if(activeTab === 'battle') renderCurrentTab();
+    }, err => { console.warn('Battle listener failed', err); toast('Live battle sync failed. Check Firestore rules.'); });
+    activeTab = 'battle';
+    renderApp();
+  }
+
+  function renderBattleMatch(main){
+    const data = battleSession.data || {};
+    const players = data.players || {};
+    const scores = data.scores || {};
+    const playerList = Object.values(players);
+    const target = data.targetScore || 10;
+    const pid = activeProfile.id;
+    const meInBattle = !!players[pid];
+    if(!meInBattle){
+      main.innerHTML = `<section class="hero-card"><div class="eyebrow">Live Battle</div><h1>Battle ${h(battleSession.code)}</h1><p class="muted">This device is using ${h(activeProfile.name)}, who is not in this battle yet.</p><button class="btn primary" data-battle-join-self>Join as ${h(activeProfile.name)}</button></section>`;
+      main.querySelector('[data-battle-join-self]').addEventListener('click', () => joinBattleMatch(battleSession.code));
+      return;
+    }
+    if(data.status === 'complete'){
+      const winnerId = data.winner;
+      const winner = players[winnerId] || {name:data.winnerName || 'Winner', avatar:'🏆'};
+      main.innerHTML = `<section class="center-page" style="min-height:auto;padding:10px 0"><div class="auth-card battle-complete"><div class="battle-symbols"><span>☬</span><span>🏆</span><span>🛡️</span></div><div class="eyebrow">Battle complete</div><h1>${h(winner.avatar || '🏆')} ${h(winner.name)} wins!</h1><p class="muted">Papa Ji says: great effort from both learners. Rematch keeps Punjabi Power growing.</p>${battleScoreboardHtml(players, scores, target)}<div class="button-row" style="justify-content:center;margin-top:16px"><button class="btn primary big" data-battle-rematch>Start rematch</button><button class="btn secondary big" data-battle-leave>Leave battle</button></div></div></section>`;
+      main.querySelector('[data-battle-rematch]').addEventListener('click', rematchBattle);
+      main.querySelector('[data-battle-leave]').addEventListener('click', leaveBattle);
+      return;
+    }
+    if(playerList.length < 2 || data.status === 'waiting'){
+      main.innerHTML = `<section class="hero-card"><div class="eyebrow">Waiting for opponent</div><h1>Battle code: <span class="battle-code">${h(battleSession.code)}</span></h1><p class="muted">Open Punjabi Quest on the second device, choose the other player, go to Battle, and enter this code.</p>${battleScoreboardHtml(players, scores, target)}<div class="button-row"><button class="btn secondary" data-battle-copy>Copy code</button><button class="btn ghost" data-battle-leave>Leave battle</button></div></section>`;
+      main.querySelector('[data-battle-copy]').addEventListener('click', () => navigator.clipboard?.writeText(battleSession.code).then(()=>toast('Battle code copied.')).catch(()=>toast(battleSession.code)));
+      main.querySelector('[data-battle-leave]').addEventListener('click', leaveBattle);
+      return;
+    }
+    if(!battleSession.currentQuestion) battleSession.currentQuestion = makeBattleQuestion(activeProfile);
+    const q = battleSession.currentQuestion;
+    main.innerHTML = `<section class="battle-arena">
+      <div class="battle-header-card">
+        <div><div class="eyebrow">Live Battle · Code ${h(battleSession.code)}</div><h1>☬ First to ${target}</h1><p class="muted">Your questions match your own level. The scoreboard is shared live.</p></div>
+        <button class="btn ghost" data-battle-leave>Leave</button>
+      </div>
+      ${battleScoreboardHtml(players, scores, target)}
+      <div class="lesson-card battle-question-card">
+        ${papaInlineHtml('guide', 'Papa Ji says: stay calm, read the Gurmukhi, then strike with the right answer.')}
+        <div class="battle-symbols small-symbols"><span>☬</span><span>🛡️</span><span>⚔️</span></div>
+        <div class="eyebrow">${h(activeProfile.name)}'s question</div>
+        <h2>${h(q.prompt)}</h2>
+        <div class="prompt ${q.displayLang === 'pa' ? 'punjabi' : ''}" ${q.displayLang === 'pa' ? 'lang="pa"' : ''}>${h(q.display)}</div>
+        <div class="audio-row"><button class="btn secondary" data-speak="${h(q.listen || q.display)}">🔊 Listen</button></div>
+        <div class="choice-grid battle-choice-grid">${q.choices.map(c => `<button class="choice" data-battle-choice="${h(c)}">${h(c)}</button>`).join('')}</div>
+        <div id="battleFeedback" class="feedback"></div>
+      </div>
+    </section>`;
+    main.querySelector('[data-battle-leave]').addEventListener('click', leaveBattle);
+    main.querySelectorAll('[data-speak]').forEach(btn => btn.addEventListener('click', () => speak(btn.dataset.speak)));
+    main.querySelectorAll('[data-battle-choice]').forEach(btn => btn.addEventListener('click', () => submitBattleAnswer(btn.dataset.battleChoice)));
+  }
+
+  function battleScoreboardHtml(players, scores, target){
+    const entries = Object.values(players || {});
+    return `<div class="battle-scoreboard">${entries.map(p => {
+      const score = scores?.[p.id] || 0;
+      const pct = Math.max(0, Math.min(100, (score / target) * 100));
+      return `<div class="battle-player-card ${p.id === activeProfile?.id ? 'me' : ''}"><div class="battle-player-top"><span class="battle-avatar ${h(p.className || '')}">${h(p.avatar || '⭐')}</span><div><strong>${h(p.name)}</strong><p class="small">${p.id === activeProfile?.id ? 'This device' : 'Opponent'}</p></div><span class="battle-score">${score}</span></div><div class="bar"><span style="width:${pct}%"></span></div></div>`;
+    }).join('')}</div>`;
+  }
+
+  function makeBattleQuestion(profile){
+    const progress = profile.progress || emptyProgress();
+    const currentLesson = getCurrentLesson(progress);
+    const completed = progress.completedLessons.length;
+    const due = Object.values(progress.reviewItems || {}).filter(i => !i.nextDue || i.nextDue <= TODAY());
+    const lessonWords = (currentLesson?.words || []).concat(DATA.vocab.slice(Math.max(0, completed - 6), completed + 18));
+    const lessonPhrases = (currentLesson?.phrases || []).concat(DATA.phrases.slice(Math.max(0, completed - 6), completed + 16));
+    let item;
+    if(due.length && Math.random() < 0.35) item = shuffle(due)[0];
+    else if(completed > 35 && lessonPhrases.length && Math.random() < 0.45) item = shuffle(lessonPhrases)[0];
+    else item = shuffle(lessonWords.filter(Boolean))[0] || shuffle(DATA.vocab)[0];
+    const isPhrase = !!(item.pa || (item.gurmukhi && String(item.gurmukhi).includes(' ')));
+    const gurmukhi = item.gurmukhi || item.pa || item.text || '';
+    const english = item.english || item.en || '';
+    const translit = item.translit || item.tr || '';
+    if(completed > 20 && Math.random() < 0.45 && !isPhrase){
+      return { id:item.id || gurmukhi, item, prompt:'Choose the Punjabi word.', display:english, displayLang:'en', target:gurmukhi, listen:gurmukhi, choices:makeChoices(gurmukhi, DATA.vocab.map(v=>v.gurmukhi)) };
+    }
+    if(completed > 70 && isPhrase){
+      return { id:item.id || gurmukhi, item, prompt:'What does this Punjabi sentence mean?', display:gurmukhi, displayLang:'pa', target:english, listen:gurmukhi, choices:makeChoices(english, DATA.phrases.map(p=>p.english).concat(DATA.vocab.map(v=>v.english))) };
+    }
+    return { id:item.id || gurmukhi, item, prompt:'What does this mean?', display:gurmukhi, displayLang:'pa', target:english, listen:gurmukhi, choices:makeChoices(english, DATA.vocab.map(v=>v.english).concat(DATA.phrases.map(p=>p.english))) };
+  }
+
+  async function submitBattleAnswer(choice){
+    if(!battleSession || battleSession.locked || !battleSession.currentQuestion) return;
+    battleSession.locked = true;
+    const q = battleSession.currentQuestion;
+    const correct = normalize(choice) === normalize(q.target);
+    const delta = correct ? 1 : -1;
+    const pid = activeProfile.id;
+    const target = battleSession.data?.targetScore || 10;
+    trackBattleLearning(q, correct, choice);
+    const fb = document.getElementById('battleFeedback');
+    if(fb){
+      fb.className = `feedback show ${correct ? 'good' : 'bad'}`;
+      fb.innerHTML = correct ? papaFeedbackHtml('correct', 'Yay!', '+1 point. Khanda Shield power!') : papaFeedbackHtml('incorrect', 'Oh No!', '-1 point, but Papa Ji says keep going.', `<p>Correct answer: <strong>${h(q.target)}</strong></p>`);
+    }
+    APP.querySelectorAll('[data-battle-choice]').forEach(btn => { btn.disabled = true; if(normalize(btn.dataset.battleChoice) === normalize(q.target)) btn.classList.add('correct'); else if(btn.dataset.battleChoice === choice) btn.classList.add('wrong'); });
+    try {
+      await cloud.db.runTransaction(async tx => {
+        const snap = await tx.get(battleSession.ref);
+        if(!snap.exists) throw new Error('missing-battle');
+        const data = snap.data() || {};
+        if(data.status === 'complete') return;
+        const scores = Object.assign({}, data.scores || {});
+        scores[pid] = (Number(scores[pid]) || 0) + delta;
+        const update = { scores, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), lastAnswer:{profileId:pid, name:activeProfile.name, correct, delta, at:new Date().toISOString(), target:q.target} };
+        if(scores[pid] >= target){ update.status = 'complete'; update.winner = pid; update.winnerName = activeProfile.name; update.completedAt = firebase.firestore.FieldValue.serverTimestamp(); }
+        tx.set(battleSession.ref, update, {merge:true});
+      });
+    } catch(err){ console.warn(err); toast('Score could not update. Check connection.'); }
+    setTimeout(() => { if(battleSession){ battleSession.currentQuestion = null; battleSession.locked = false; if(activeTab === 'battle') renderCurrentTab(); } }, correct ? 650 : 1200);
+  }
+
+  function trackBattleLearning(q, correct, answer){
+    strengthenItem(q.item || q, correct);
+    if(!correct){
+      const p = activeProfile.progress;
+      p.mistakes.unshift({when:new Date().toISOString(), lessonId:'live-battle', type:'battle', prompt:q.prompt, target:q.target, answer:answer || '', skipped:false, item:q.item || null});
+      p.mistakes = p.mistakes.slice(0,100);
+    }
+    updateStreak(activeProfile.progress);
+    saveState();
+  }
+
+  async function rematchBattle(){
+    if(!battleSession?.ref || !battleSession?.data) return;
+    const players = battleSession.data.players || {};
+    const scores = {};
+    Object.keys(players).forEach(id => scores[id] = 0);
+    try {
+      await battleSession.ref.set({scores, status:Object.keys(players).length >= 2 ? 'active' : 'waiting', winner:null, winnerName:null, lastAnswer:null, rematchAt:firebase.firestore.FieldValue.serverTimestamp(), updatedAt:firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
+      battleSession.currentQuestion = null; battleSession.locked = false; toast('Rematch started.');
+    } catch(err){ console.warn(err); toast('Could not start rematch.'); }
+  }
+
+  function leaveBattle(){
+    if(battleSession?.unsubscribe) battleSession.unsubscribe();
+    battleSession = null;
+    activeTab = 'battle';
+    renderApp();
+  }
+
   function renderParent(main){
     const p = activeProfile.progress;
     const completePct = Math.round((p.completedLessons.length / DATA.lessonCount) * 100);
@@ -976,10 +1231,10 @@
     const user = cloud.user;
     const last = cloud.lastSyncedAt ? new Date(cloud.lastSyncedAt).toLocaleString() : 'Not synced yet';
     return `<div class="cloud-panel">
-      <div class="cloud-row"><span class="cloud-dot ${user?'on':configured?'warn':'off'}"></span><div><strong>${h(cloudStatusText())}</strong><p class="small">Last sync: ${h(last)} · Device: ${h((state.deviceId||'device').slice(0,10))}</p></div></div>
+      <div class="cloud-row"><span class="cloud-dot ${user?'on':configured?'warn':'off'}"></span><div><strong>${h(cloudStatusText())}</strong><p class="small">${user ? `Parent account: ${h(user.email || 'Signed in')} · ${h(cloudProviderLabel())}<br>` : ''}Last sync: ${h(last)} · Device: ${h((state.deviceId||'device').slice(0,10))}</p></div></div>
       <p class="muted">Cloud sync uses one parent email account and keeps Sujaan, Guntaas, and Guest progress together across iPad and laptop. Local progress still works offline.</p>
       <div class="button-row">
-        <button class="btn primary" data-cloud-login>${user ? 'Manage cloud account' : 'Parent email login'}</button>
+        <button class="btn primary" data-cloud-login>${user ? 'Manage cloud account' : 'Parent login'}</button>
         <button class="btn secondary" data-cloud-backup ${user?'':'disabled'}>Create backup now</button>
         <button class="btn secondary" data-cloud-push ${user?'':'disabled'}>Enable reminders</button>
         ${user ? '<button class="btn ghost" data-cloud-signout>Sign out</button>' : ''}
@@ -1076,7 +1331,7 @@
         cloud.initialRemoteHandled = true;
         uploadStateToCloud({makeBackup:false});
       }
-      if(!lessonSession && !storySession && !convoSession){ if(activeProfile) renderApp(); }
+      if(!lessonSession && !storySession && !convoSession && !battleSession){ if(activeProfile) renderApp(); }
     }, err => {
       console.warn('Cloud listener failed', err);
       cloud.status = 'Cloud sync error';
@@ -1112,7 +1367,7 @@
         clientUpdatedAt: new Date().toISOString(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         deviceId: state.deviceId || getDeviceId(),
-        appVersion: '1.1.0'
+        appVersion: '1.2.1'
       };
       await cloudDocRef().set(payload, {merge:true});
       cloud.lastSyncedAt = payload.clientUpdatedAt;
@@ -1147,19 +1402,20 @@
 
   function showCloudLoginModal(){
     if(!cloud.configured){
-      createModal(`<div class="eyebrow">Cloud setup needed</div><h2>Firebase is not configured yet</h2><p class="muted">Open <strong>js/firebase-config.js</strong>, paste your Firebase Web app config, and set <strong>enabled: true</strong>. After that, reload the site and sign in with the parent email.</p><div class="button-row"><button class="btn secondary" data-close-modal>Close</button></div>`);
+      createModal(`<div class="eyebrow">Cloud setup needed</div><h2>Firebase is not configured yet</h2><p class="muted">Open <strong>js/firebase-config.js</strong>, paste your Firebase Web app config, and set <strong>enabled: true</strong>. After that, reload the site and sign in with the parent account.</p><div class="button-row"><button class="btn secondary" data-close-modal>Close</button></div>`);
       return;
     }
     if(cloud.user){
-      createModal(`<div class="eyebrow">Cloud account</div><h2>Signed in</h2><p class="muted">${h(cloud.user.email || 'Parent account')}</p><p><strong>Status:</strong> ${h(cloudStatusText())}</p><p class="small">Last sync: ${h(cloud.lastSyncedAt ? new Date(cloud.lastSyncedAt).toLocaleString() : 'Not synced yet')}</p><div class="button-row"><button class="btn primary" id="cloudBackupNow">Create backup now</button><button class="btn secondary" id="cloudPushNow">Enable reminders</button><button class="btn danger" id="cloudSignOut">Sign out</button><button class="btn ghost" data-close-modal>Close</button></div>`);
+      createModal(`<div class="eyebrow">Cloud account</div><h2>Signed in</h2><p class="muted">${h(cloud.user.email || 'Parent account')} · ${h(cloudProviderLabel())}</p><p><strong>Status:</strong> ${h(cloudStatusText())}</p><p class="small">Last sync: ${h(cloud.lastSyncedAt ? new Date(cloud.lastSyncedAt).toLocaleString() : 'Not synced yet')}</p><div class="button-row"><button class="btn primary" id="cloudBackupNow">Create backup now</button><button class="btn secondary" id="cloudPushNow">Enable reminders</button><button class="btn danger" id="cloudSignOut">Sign out</button><button class="btn ghost" data-close-modal>Close</button></div>`);
       document.getElementById('cloudBackupNow').addEventListener('click', () => createCloudBackup(true));
       document.getElementById('cloudPushNow').addEventListener('click', enablePushNotifications);
       document.getElementById('cloudSignOut').addEventListener('click', signOutCloud);
       return;
     }
-    const modal = createModal(`<div class="eyebrow">Parent email login</div><h2>Turn on cloud sync</h2><p class="muted">Use one parent email and password for the family. This syncs Sujaan, Guntaas, and Guest progress across devices.</p><div class="grid"><input class="text-input" id="cloudEmail" type="email" autocomplete="email" placeholder="Parent email"><input class="text-input" id="cloudPassword" type="password" autocomplete="current-password" placeholder="Password, at least 6 characters"></div><div class="button-row" style="margin-top:14px"><button class="btn primary" id="cloudSignIn">Sign in</button><button class="btn secondary" id="cloudCreate">Create account</button><button class="btn ghost" data-close-modal>Cancel</button></div><p class="small">Firebase email/password sign-in must be enabled in your Firebase console first.</p>`);
+    const modal = createModal(`<div class="eyebrow">Parent login</div><h2>Turn on cloud sync</h2><p class="muted">Use one parent account for the family. This syncs Sujaan, Guntaas, Battle Mode, and backups across devices.</p><button class="btn google-login" id="cloudGoogle">Continue with Google</button><div class="or-divider"><span>or use email/password</span></div><div class="grid"><input class="text-input" id="cloudEmail" type="email" autocomplete="email" placeholder="Parent email"><input class="text-input" id="cloudPassword" type="password" autocomplete="current-password" placeholder="Password, at least 6 characters"></div><div class="button-row" style="margin-top:14px"><button class="btn primary" id="cloudSignIn">Sign in</button><button class="btn secondary" id="cloudCreate">Create account</button><button class="btn ghost" data-close-modal>Cancel</button></div><p class="small">Enable Google and Email/Password in Firebase Authentication. If an account already exists with the same email, Punjabi Quest will help link it.</p>`);
     const email = modal.querySelector('#cloudEmail');
     const pass = modal.querySelector('#cloudPassword');
+    modal.querySelector('#cloudGoogle').addEventListener('click', signInWithGoogleCloud);
     modal.querySelector('#cloudSignIn').addEventListener('click', () => signInCloud(email.value.trim(), pass.value));
     modal.querySelector('#cloudCreate').addEventListener('click', () => createCloudAccount(email.value.trim(), pass.value));
   }
@@ -1175,14 +1431,65 @@
   async function createCloudAccount(email, password){
     if(!email || !password || password.length < 6){ toast('Use an email and a password with at least 6 characters.'); return; }
     try {
-      await cloud.auth.createUserWithEmailAndPassword(email, password);
-      closeModal(); toast('Cloud account created. Sync starting.');
+      if(cloud.user && cloud.user.email && cloud.user.email.toLowerCase() === email.toLowerCase()){
+        const credential = firebase.auth.EmailAuthProvider.credential(email, password);
+        await cloud.user.linkWithCredential(credential);
+        closeModal(); toast('Email/password linked to this parent account.');
+      } else {
+        await cloud.auth.createUserWithEmailAndPassword(email, password);
+        closeModal(); toast('Cloud account created. Sync starting.');
+      }
       queueCloudSave(100);
     } catch(err){ toast(firebaseAuthMessage(err)); }
   }
 
+  async function signInWithGoogleCloud(){
+    if(!cloud.auth){ toast('Firebase Auth is not ready yet.'); return; }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    try {
+      await cloud.auth.signInWithPopup(provider);
+      closeModal();
+      toast('Signed in with Google. Cloud sync starting.');
+      queueCloudSave(100);
+    } catch(err){
+      if(err?.code === 'auth/popup-blocked' || err?.code === 'auth/operation-not-supported-in-this-environment'){
+        try { await cloud.auth.signInWithRedirect(provider); }
+        catch(redirectErr){ toast(firebaseAuthMessage(redirectErr)); }
+        return;
+      }
+      if(err?.code === 'auth/account-exists-with-different-credential'){
+        showGoogleLinkPasswordModal(err);
+        return;
+      }
+      toast(firebaseAuthMessage(err));
+    }
+  }
+
+  function showGoogleLinkPasswordModal(err){
+    const email = err.email || '';
+    const pendingCredential = firebase.auth.GoogleAuthProvider.credentialFromError(err);
+    const modal = createModal(`<div class="eyebrow">Link parent account</div><h2>This email already exists</h2><p class="muted">${h(email)} already has an email/password login. Enter that password once and Punjabi Quest will link Google Sign-In to the same parent account.</p><input class="text-input" id="linkPassword" type="password" autocomplete="current-password" placeholder="Existing password"><div class="button-row" style="margin-top:14px"><button class="btn primary" id="linkGoogleNow">Link Google</button><button class="btn ghost" data-close-modal>Cancel</button></div>`);
+    const input = modal.querySelector('#linkPassword');
+    modal.querySelector('#linkGoogleNow').addEventListener('click', async () => {
+      if(!input.value){ toast('Enter the existing password.'); return; }
+      try {
+        const result = await cloud.auth.signInWithEmailAndPassword(email, input.value);
+        if(pendingCredential) await result.user.linkWithCredential(pendingCredential);
+        closeModal(); toast('Google Sign-In linked. Cloud sync starting.'); queueCloudSave(100);
+      } catch(linkErr){ toast(firebaseAuthMessage(linkErr)); }
+    });
+  }
+
+  function cloudProviderLabel(){
+    const providerIds = (cloud.user?.providerData || []).map(p => p.providerId);
+    if(providerIds.includes('google.com')) return 'Google Sign-In';
+    if(providerIds.includes('password')) return 'Email/Password';
+    return 'Parent account';
+  }
+
   async function signOutCloud(){
-    try { await cloud.auth.signOut(); closeModal(); toast('Signed out of cloud sync. Local progress remains saved.'); }
+    try { if(battleSession?.unsubscribe) battleSession.unsubscribe(); battleSession = null; await cloud.auth.signOut(); closeModal(); toast('Signed out of cloud sync. Local progress remains saved.'); }
     catch(err){ toast('Could not sign out.'); }
   }
 
@@ -1191,7 +1498,9 @@
     if(code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) return 'Email or password did not match.';
     if(code.includes('email-already-in-use')) return 'That email already has an account. Use Sign in.';
     if(code.includes('weak-password')) return 'Password must be at least 6 characters.';
-    if(code.includes('operation-not-allowed')) return 'Enable Email/Password sign-in in Firebase Authentication.';
+    if(code.includes('popup-closed-by-user')) return 'Google sign-in was closed before it finished.';
+    if(code.includes('account-exists-with-different-credential')) return 'This email already exists. Link the existing account to Google.';
+    if(code.includes('operation-not-allowed')) return 'Enable the selected sign-in method in Firebase Authentication.';
     return 'Cloud login failed. Check Firebase setup.';
   }
 
@@ -1240,7 +1549,7 @@
 
   function mergeStates(local, remote){
     const merged = Object.assign({}, remote || {}, local || {});
-    merged.version = '1.2.0';
+    merged.version = '1.2.1';
     merged.deviceId = local.deviceId || getDeviceId();
     merged.selectedProfileId = local.selectedProfileId || remote?.selectedProfileId || null;
     merged.updatedAt = maxIso(local.updatedAt, remote?.updatedAt) || new Date().toISOString();

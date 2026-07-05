@@ -2,7 +2,7 @@
   "id": "/punjabi-quest/",
   "name": "Punjabi Quest",
   "short_name": "Punjabi Quest",
-  "description": "A child-friendly Punjabi learning app for Gurmukhi, speaking, stories, review, cloud sync, and Papa Ji guidance.",
+  "description": "A child-friendly Punjabi learning app for Gurmukhi, speaking, stories, review, cloud sync, Live Battle Mode, Google Sign-In, and Papa Ji guidance.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

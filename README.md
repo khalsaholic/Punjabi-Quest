@@ -1,9 +1,23 @@
-# Punjabi Quest v1.2
+# Punjabi Quest v1.2.1
 
-Punjabi Quest is a GitHub Pages-ready Punjabi learning app for Sujaan, Guntaas, and Guest. Version 1.2 keeps the v1.1 Firebase cloud-sync features and adds Papa Ji, the friendly host character, guide, mentor, and encouragement figure throughout the learning experience.
+Punjabi Quest is a GitHub Pages-ready Punjabi learning app for Sujaan, Guntaas, and Guest. Version 1.2.1 keeps the v1.2 Papa Ji experience and Firebase cloud-sync foundation, then adds Google Sign-In support and Live Battle Mode.
+
+## Important update checklist
+
+Before replacing files in GitHub for any future update:
+
+1. Confirm cloud sync is active and not showing “Local only.”
+2. Export Sujaan’s progress from Parent Dashboard.
+3. Export Guntaas’s progress from Parent Dashboard.
+4. Save those exports in iCloud Drive or another safe folder.
+5. Upload the new app files to GitHub and commit changes.
+6. After GitHub Pages updates, sign in and verify XP, streaks, badges, and completed lessons.
+
+Student progress is stored in Firebase after cloud sync is active. Replacing GitHub files updates the app code, not the Firebase progress database.
 
 ## What is included
 
+- Everything from Punjabi Quest v1.2
 - 12 worlds and 312 generated starter lessons
 - Separate child profiles: Sujaan, Guntaas, and Guest
 - PINs: Sujaan `0815`, Guntaas `0731`
@@ -12,39 +26,43 @@ Punjabi Quest is a GitHub Pages-ready Punjabi learning app for Sujaan, Guntaas, 
 - SpeechSynthesis audio buttons
 - Web Speech API speaking practice where supported
 - Stories, conversation practice, reading feed, missions, and parent dashboard
-- localStorage fallback progress
-- Firebase Authentication email/password parent login
-- Firestore cloud progress sync
-- Daily automatic Firestore backup documents
-- Manual cloud backup button
-- Firestore offline persistence where the browser supports it
-- PWA install support for iPad and laptop
-- Firebase Cloud Messaging token registration for future push reminders
-- Papa Ji host character with guide, correct-answer, incorrect-answer, and lesson-complete expressions
+- Papa Ji guide, correct-answer, incorrect-answer, and lesson-complete expressions
+- Firebase cloud sync with localStorage fallback
+- Parent login with Google Sign-In
+- Parent login with Email/Password, kept for fallback
+- Sign out button
+- Google and Email/Password account linking support when the same email is used
+- Parent dashboard showing the signed-in account and sign-in provider
+- Live Battle Mode for two players on two devices
+- Live Firestore scoreboard
+- Personalized battle questions based on each player’s progress
+- Correct answer: +1 point
+- Incorrect answer: -1 point
+- First player to 10 points wins
+- Rematch button
+- Sikh-inspired khanda, shield, and kirpan-style battle graphics using respectful icons
 
+## Live Battle Mode
 
-## Papa Ji host character
+Live Battle Mode uses Firestore so two devices can see the same match in real time.
 
-Version 1.2 incorporates Papa Ji as the learner’s friendly guide and mentor. Papa Ji appears in onboarding, lesson guidance, correct-answer feedback, supportive incorrect-answer feedback, conversation practice, story quizzes, and lesson-complete celebration screens.
+How to use:
 
-The Papa Ji character assets are stored in:
+1. Sign into the same parent account on both devices.
+2. On device 1, choose Sujaan or Guntaas, open **Battle**, then tap **Create battle**.
+3. Copy or read the battle code.
+4. On device 2, choose the other child profile, open **Battle**, enter the code, then tap **Join battle**.
+5. Both players answer their own personalized questions.
+6. The shared scoreboard updates live.
+7. First to 10 points wins.
+8. Tap **Start rematch** to reset the same match for another round.
 
-```text
-assets/characters/
-```
-
-To replace or improve the character later, keep the same filenames and image proportions where possible. The app will automatically use the updated files.
-
-## Important limitation about push notifications
-
-This static GitHub Pages app can register a device for Firebase Cloud Messaging after Firebase is configured and a VAPID key is added. Actually sending scheduled push reminders requires messages to be sent from Firebase Console or from a backend/scheduled function. No backend is included because this project is designed to stay static and GitHub Pages-compatible.
-
-On iPad and iPhone, web push works only for web apps added to the Home Screen on supported iOS/iPadOS versions. Regular Safari tabs may not behave the same way.
+Important: both devices should use the same Firebase parent account, because the battle is stored under that parent’s family account.
 
 ## File structure
 
 ```text
-punjabi-quest-v1.2/
+punjabi-quest-v1.2.1/
 ├── index.html
 ├── manifest.webmanifest
 ├── sw.js
@@ -73,58 +91,39 @@ punjabi-quest-v1.2/
 
 ## Deploy to GitHub Pages
 
-1. Create a public GitHub repository.
-2. Upload all files and folders from this project into the repository root.
-3. Go to **Settings > Pages**.
-4. Set source to **Deploy from a branch**.
-5. Set branch to **main** and folder to **/ root**.
-6. Save and wait for GitHub Pages to publish.
+For an existing Punjabi Quest repository:
 
-## Firebase setup
+1. Export both students’ progress first.
+2. Unzip this folder.
+3. Upload everything inside `punjabi-quest-v1.2.1` to the root of the GitHub repository.
+4. Commit changes.
+5. Wait 1 to 3 minutes for GitHub Pages to update.
+6. Open the app with a cache-busting URL if needed, for example `?v=121`.
 
-### 1. Create a Firebase project
+Do not upload the ZIP itself.
 
-Go to Firebase Console and create a new project.
+## Firebase setup notes
 
-### 2. Add a Web app
-
-Inside the Firebase project, add a Web app. Firebase will show a `firebaseConfig` object.
-
-### 3. Enable Authentication
-
-Go to **Build > Authentication > Sign-in method**.
-Enable **Email/Password**.
-
-### 4. Create Firestore database
-
-Go to **Build > Firestore Database**.
-Create a database. For a family app, start in production mode and use the rules below.
-
-### 5. Paste Firebase config
-
-Open:
+This v1.2.1 package includes the Firebase Web app config that was already created for this project in:
 
 ```text
 js/firebase-config.js
 ```
 
-Paste your Firebase Web app config and set:
+You should not need to recreate the Firebase project, Authentication, or Firestore database.
 
-```js
-enabled: true
-```
+### Authentication providers
 
-Also open:
+In Firebase Authentication, enable both:
 
-```text
-firebase-messaging-sw.js
-```
+- Google
+- Email/Password
 
-Paste the same `firebaseConfig` values into that file if you want Firebase Cloud Messaging support.
+Google Sign-In is now shown directly in the app.
 
-### 6. Firestore security rules
+### Firestore security rules for v1.2.1
 
-Use these starter rules so each signed-in parent can only read and write their own family document and backups:
+Live Battle Mode stores match documents under each signed-in parent’s family document. Use these rules so the signed-in parent can read and write only their own family data, backups, devices, and battles:
 
 ```js
 rules_version = '2';
@@ -140,41 +139,24 @@ service cloud.firestore {
       match /devices/{deviceId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+
+      match /battles/{battleId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
   }
 }
 ```
 
-### 7. Optional: Web Push VAPID key
+If cloud sync or Battle Mode says “Check Firestore rules,” paste and publish the rules above in Firebase Console > Firestore Database > Rules.
 
-In Firebase Console, go to **Project Settings > Cloud Messaging** and generate a Web Push certificate key pair. Copy the VAPID key into:
+## Push notifications limitation
 
-```text
-js/firebase-config.js
-```
-
-Push registration can then save the device token in Firestore. To actually send push reminders, use Firebase Console campaigns or add a later scheduled backend.
-
-## How cloud sync works
-
-1. The app always saves to localStorage first.
-2. If the parent is signed in, the app uploads the whole family progress state to Firestore.
-3. Other signed-in devices listen for updates and merge the state.
-4. A daily automatic backup document is created in Firestore.
-5. Manual backup is available in Parent Dashboard.
-6. If the device goes offline, local progress continues and sync resumes when online.
-
-## How to use on iPad
-
-1. Open the GitHub Pages link in Safari.
-2. Tap Share.
-3. Tap **Add to Home Screen**.
-4. Open Punjabi Quest from the Home Screen icon.
-5. Sign in with the parent email account.
+This static GitHub Pages app can register a device for Firebase Cloud Messaging after Firebase is configured and a VAPID key is added. Actually sending scheduled push reminders requires Firebase Console campaigns or a future backend/scheduled function. No backend is included because this project is designed to stay GitHub Pages-compatible.
 
 ## Keeping progress safe
 
-Cloud sync is the primary backup after Firebase is configured. You can still use **Parent Dashboard > Export progress** as a manual backup before major changes.
+Cloud sync is the primary backup after Firebase is configured. You can still use **Parent Dashboard > Export progress** before major changes.
 
 ## Adding more content
 
@@ -195,4 +177,3 @@ Alphabet and vowel cards live in:
 ```text
 js/data/alphabet.js
 ```
-
