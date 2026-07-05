@@ -1,6 +1,6 @@
 /*
   Punjabi Quest Firebase settings
-  This v1.2.1 file is pre-filled with the Firebase Web app config you created.
+  This v1.2.2 file is pre-filled with the Firebase Web app config you created.
   Firebase web API keys are not secret, but Firestore security rules still must protect user data.
 */
 window.PQ_FIREBASE_CONFIG = {

@@ -1,13 +1,14 @@
 window.PQ_ALPHABET = [
   {
     "letter": "ੳ",
-    "name": "ura",
+    "name": "oora",
     "sound": "u / oo",
     "word": "ਉੱਲੂ",
     "wordTranslit": "ullu",
     "meaning": "owl",
     "emoji": "🦉",
-    "note": "Used with vowel sounds, often at the start of words."
+    "note": "Used with vowel sounds, often at the start of words.",
+    "namePunjabi": "ਊੜਾ"
   },
   {
     "letter": "ਅ",
@@ -17,17 +18,19 @@ window.PQ_ALPHABET = [
     "wordTranslit": "amb",
     "meaning": "mango",
     "emoji": "🥭",
-    "note": "Short a sound, as in amb."
+    "note": "Short a sound, as in amb.",
+    "namePunjabi": "ਐੜਾ"
   },
   {
     "letter": "ੲ",
-    "name": "iri",
+    "name": "eeree",
     "sound": "i / ee",
     "word": "ਇਮਲੀ",
     "wordTranslit": "imli",
     "meaning": "tamarind",
     "emoji": "🌿",
-    "note": "Used with i and ee vowel sounds."
+    "note": "Used with i and ee vowel sounds.",
+    "namePunjabi": "ਈੜੀ"
   },
   {
     "letter": "ਸ",
@@ -37,7 +40,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "seb",
     "meaning": "apple",
     "emoji": "🍎",
-    "note": "Sound like s in sun."
+    "note": "Sound like s in sun.",
+    "namePunjabi": "ਸੱਸਾ"
   },
   {
     "letter": "ਹ",
@@ -47,7 +51,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "haathi",
     "meaning": "elephant",
     "emoji": "🐘",
-    "note": "Sound like h in hello."
+    "note": "Sound like h in hello.",
+    "namePunjabi": "ਹਾਹਾ"
   },
   {
     "letter": "ਕ",
@@ -57,7 +62,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "kabootar",
     "meaning": "pigeon",
     "emoji": "🕊️",
-    "note": "Unaspirated k sound."
+    "note": "Unaspirated k sound.",
+    "namePunjabi": "ਕੱਕਾ"
   },
   {
     "letter": "ਖ",
@@ -67,7 +73,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "khargosh",
     "meaning": "rabbit",
     "emoji": "🐰",
-    "note": "K with a puff of air."
+    "note": "K with a puff of air.",
+    "namePunjabi": "ਖੱਖਾ"
   },
   {
     "letter": "ਗ",
@@ -77,7 +84,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "gaan",
     "meaning": "cow",
     "emoji": "🐄",
-    "note": "Hard g, as in go."
+    "note": "Hard g, as in go.",
+    "namePunjabi": "ਗੱਗਾ"
   },
   {
     "letter": "ਘ",
@@ -87,7 +95,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "ghar",
     "meaning": "home",
     "emoji": "🏠",
-    "note": "G with a puff of air."
+    "note": "G with a puff of air.",
+    "namePunjabi": "ਘੱਗਾ"
   },
   {
     "letter": "ਙ",
@@ -97,7 +106,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "angoor",
     "meaning": "grapes",
     "emoji": "🍇",
-    "note": "Ng sound, usually inside words."
+    "note": "Ng sound, usually inside words.",
+    "namePunjabi": "ਙੰਙਾ"
   },
   {
     "letter": "ਚ",
@@ -107,7 +117,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "chaah",
     "meaning": "tea",
     "emoji": "🍵",
-    "note": "Ch as in chair."
+    "note": "Ch as in chair.",
+    "namePunjabi": "ਚੱਚਾ"
   },
   {
     "letter": "ਛ",
@@ -117,7 +128,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "chhatri",
     "meaning": "umbrella",
     "emoji": "☂️",
-    "note": "Ch with a stronger puff of air."
+    "note": "Ch with a stronger puff of air.",
+    "namePunjabi": "ਛੱਛਾ"
   },
   {
     "letter": "ਜ",
@@ -127,7 +139,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "jahaaz",
     "meaning": "airplane",
     "emoji": "✈️",
-    "note": "J as in jam."
+    "note": "J as in jam.",
+    "namePunjabi": "ਜੱਜਾ"
   },
   {
     "letter": "ਝ",
@@ -137,7 +150,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "jhanda",
     "meaning": "flag",
     "emoji": "🚩",
-    "note": "J with a puff of air."
+    "note": "J with a puff of air.",
+    "namePunjabi": "ਝੱਝਾ"
   },
   {
     "letter": "ਞ",
@@ -147,7 +161,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "punjabi",
     "meaning": "Punjabi",
     "emoji": "🗣️",
-    "note": "Rare letter sound, often learned for completeness."
+    "note": "Rare letter sound, often learned for completeness.",
+    "namePunjabi": "ਞੰਞਾ"
   },
   {
     "letter": "ਟ",
@@ -157,7 +172,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "tamaatar",
     "meaning": "tomato",
     "emoji": "🍅",
-    "note": "Retroflex t, tongue curls back."
+    "note": "Retroflex t, tongue curls back.",
+    "namePunjabi": "ਟੈਂਕਾ"
   },
   {
     "letter": "ਠ",
@@ -167,7 +183,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "thanda",
     "meaning": "cold",
     "emoji": "🧊",
-    "note": "Retroflex th with puff of air."
+    "note": "Retroflex th with puff of air.",
+    "namePunjabi": "ਠੱਠਾ"
   },
   {
     "letter": "ਡ",
@@ -177,7 +194,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "dabba",
     "meaning": "box",
     "emoji": "📦",
-    "note": "Retroflex d, tongue curls back."
+    "note": "Retroflex d, tongue curls back.",
+    "namePunjabi": "ਡੱਡਾ"
   },
   {
     "letter": "ਢ",
@@ -187,7 +205,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "dhol",
     "meaning": "drum",
     "emoji": "🥁",
-    "note": "Retroflex dh with puff of air."
+    "note": "Retroflex dh with puff of air.",
+    "namePunjabi": "ਢੱਢਾ"
   },
   {
     "letter": "ਣ",
@@ -197,7 +216,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "raani",
     "meaning": "queen",
     "emoji": "👑",
-    "note": "Retroflex n, tongue curls back."
+    "note": "Retroflex n, tongue curls back.",
+    "namePunjabi": "ਣਾਣਾ"
   },
   {
     "letter": "ਤ",
@@ -207,7 +227,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "tarbooz",
     "meaning": "watermelon",
     "emoji": "🍉",
-    "note": "Dental t, tongue touches teeth."
+    "note": "Dental t, tongue touches teeth.",
+    "namePunjabi": "ਤੱਤਾ"
   },
   {
     "letter": "ਥ",
@@ -217,7 +238,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "thaali",
     "meaning": "plate",
     "emoji": "🍽️",
-    "note": "Dental th with puff of air."
+    "note": "Dental th with puff of air.",
+    "namePunjabi": "ਥੱਥਾ"
   },
   {
     "letter": "ਦ",
@@ -227,7 +249,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "daal",
     "meaning": "lentils",
     "emoji": "🥣",
-    "note": "Dental d, tongue touches teeth."
+    "note": "Dental d, tongue touches teeth.",
+    "namePunjabi": "ਦੱਦਾ"
   },
   {
     "letter": "ਧ",
@@ -237,7 +260,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "dhaniya",
     "meaning": "cilantro",
     "emoji": "🌿",
-    "note": "Dental dh with puff of air."
+    "note": "Dental dh with puff of air.",
+    "namePunjabi": "ਧੱਧਾ"
   },
   {
     "letter": "ਨ",
@@ -247,7 +271,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "nakk",
     "meaning": "nose",
     "emoji": "👃",
-    "note": "N as in no."
+    "note": "N as in no.",
+    "namePunjabi": "ਨੱਨਾ"
   },
   {
     "letter": "ਪ",
@@ -257,7 +282,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "paani",
     "meaning": "water",
     "emoji": "💧",
-    "note": "P as in spin, not much puff."
+    "note": "P as in spin, not much puff.",
+    "namePunjabi": "ਪੱਪਾ"
   },
   {
     "letter": "ਫ",
@@ -267,7 +293,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "phal",
     "meaning": "fruit",
     "emoji": "🍊",
-    "note": "Often pronounced ph or f depending on word and speaker."
+    "note": "Often pronounced ph or f depending on word and speaker.",
+    "namePunjabi": "ਫੱਫਾ"
   },
   {
     "letter": "ਬ",
@@ -277,7 +304,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "bachcha",
     "meaning": "child",
     "emoji": "🧒",
-    "note": "B as in boy."
+    "note": "B as in boy.",
+    "namePunjabi": "ਬੱਬਾ"
   },
   {
     "letter": "ਭ",
@@ -287,7 +315,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "bhra",
     "meaning": "brother",
     "emoji": "👦",
-    "note": "B with a puff of air."
+    "note": "B with a puff of air.",
+    "namePunjabi": "ਭੱਭਾ"
   },
   {
     "letter": "ਮ",
@@ -297,7 +326,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "mummy",
     "meaning": "mom",
     "emoji": "👩",
-    "note": "M as in mom."
+    "note": "M as in mom.",
+    "namePunjabi": "ਮੱਮਾ"
   },
   {
     "letter": "ਯ",
@@ -307,7 +337,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "yaad",
     "meaning": "memory",
     "emoji": "🧠",
-    "note": "Y as in yes."
+    "note": "Y as in yes.",
+    "namePunjabi": "ਯੱਯਾ"
   },
   {
     "letter": "ਰ",
@@ -317,7 +348,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "roti",
     "meaning": "roti",
     "emoji": "🫓",
-    "note": "Punjabi r is lightly tapped."
+    "note": "Punjabi r is lightly tapped.",
+    "namePunjabi": "ਰਾਰਾ"
   },
   {
     "letter": "ਲ",
@@ -327,7 +359,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "laal",
     "meaning": "red",
     "emoji": "🔴",
-    "note": "L as in leaf."
+    "note": "L as in leaf.",
+    "namePunjabi": "ਲੱਲਾ"
   },
   {
     "letter": "ਵ",
@@ -337,7 +370,8 @@ window.PQ_ALPHABET = [
     "wordTranslit": "vaal",
     "meaning": "hair",
     "emoji": "💇",
-    "note": "Can sound between v and w."
+    "note": "Can sound between v and w.",
+    "namePunjabi": "ਵਾਵਾ"
   },
   {
     "letter": "ੜ",
@@ -347,9 +381,11 @@ window.PQ_ALPHABET = [
     "wordTranslit": "ghora",
     "meaning": "horse",
     "emoji": "🐴",
-    "note": "Punjabi curled r sound."
+    "note": "Punjabi curled r sound.",
+    "namePunjabi": "ੜਾੜਾ"
   }
 ];
+
 window.PQ_VOWELS = [
   {
     "mark": "ਾ",

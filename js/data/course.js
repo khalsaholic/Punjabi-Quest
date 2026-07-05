@@ -113,12 +113,12 @@ window.PQ_COURSE = (function(){
   {
     "id": "v002",
     "theme": "greetings",
-    "gurmukhi": "ਨਮਸਤੇ",
-    "translit": "namaste",
-    "english": "hello",
+    "gurmukhi": "ਜੀ ਆਇਆਂ ਨੂੰ",
+    "translit": "ji aayan nu",
+    "english": "welcome",
     "emoji": "👋",
     "pos": "phrase",
-    "note": "Common greeting in many Indian languages.",
+    "note": "Warm Punjabi welcome used with guests and family.",
     "malwai": ""
   },
   {

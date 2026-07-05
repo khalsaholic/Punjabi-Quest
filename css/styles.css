@@ -261,3 +261,16 @@ h3 { font-size: 22px; letter-spacing: -0.3px; margin-bottom: 8px; }
   .tab { font-size:9px; padding:7px 2px; }
   .tab .icon { font-size:17px; }
 }
+
+/* Punjabi Quest v1.2.2 updates */
+.tabs { grid-template-columns: repeat(8, 1fr); }
+.translit, .translit.visible { display:none !important; color: #1d4ed8; font-size: inherit; font-weight: 800; }
+.translation, .hidden-translation { display:none !important; color: #dc2626; font-size: inherit; font-weight: 800; }
+.show-translit .translit, .show-translit .translit.visible { display:block !important; }
+.show-translation .translation, .show-translation .hidden-translation, .show-english .hidden-translation { display:block !important; }
+.punjabi, [lang="pa"] { cursor: pointer; }
+.speech-result { font-size: clamp(24px, 4vw, 38px); font-weight: 950; border-radius: 18px; padding: 12px 14px; background:#fff; border:2px solid var(--line); }
+.speech-result.speech-correct { color: var(--green-dark); border-color: #9be371; background:#f0ffed; }
+.speech-result.speech-incorrect { color: var(--red); border-color:#ffc0c0; background:#fff4f4; }
+.daily-card { border-color:#ffe0a8; background:linear-gradient(135deg,#fffdf4,#efffe8); }
+@media (max-width: 820px){ .tabs { grid-template-columns: repeat(4, 1fr); } }

@@ -1,6 +1,6 @@
-# Punjabi Quest v1.2.1
+# Punjabi Quest v1.2.2
 
-Punjabi Quest is a GitHub Pages-ready Punjabi learning app for Sujaan, Guntaas, and Guest. Version 1.2.1 keeps the v1.2 Papa Ji experience and Firebase cloud-sync foundation, then adds Google Sign-In support and Live Battle Mode.
+Punjabi Quest is a GitHub Pages-ready Punjabi learning app for Sujaan, Guntaas, and Guest. Version 1.2.2 keeps the v1.2.1 Firebase, Google Sign-In, and Live Battle Mode foundation, then adds cumulative lesson recycling, Daily Challenge, improved audio/speech handling, stricter transliteration/translation controls, parent-protected lesson reset, and Papa Ji consistency fixes.
 
 ## Important update checklist
 
@@ -41,6 +41,20 @@ Student progress is stored in Firebase after cloud sync is active. Replacing Git
 - First player to 10 points wins
 - Rematch button
 - Sikh-inspired khanda, shield, and kirpan-style battle graphics using respectful icons
+- Daily Challenge using only completed lesson content
+- Cumulative lessons that recycle earlier vocabulary and phrases
+- Active student participation in every lesson dialogue
+- Papa Ji restricted to host, teacher, guide, and encourager roles
+- Transliteration and translation hidden by default with Show buttons
+- Blue transliteration and red translation text when revealed
+- Tappable Punjabi text for pronunciation audio across the app
+- Improved pronunciation exercise flow: Speak → Check, colored Heard text, and retry support
+- Correct and incorrect answer sound effects
+- Parent-protected individual lesson reset
+- Parent PIN is never displayed
+- Removed parent PIN hints and old parent note text
+- Removed confusing App Speaks wording
+- Additional Papa Ji visual variations for listening, thinking, review, and battle support
 
 ## Live Battle Mode
 
@@ -62,7 +76,7 @@ Important: both devices should use the same Firebase parent account, because the
 ## File structure
 
 ```text
-punjabi-quest-v1.2.1/
+punjabi-quest-v1.2.2/
 ├── index.html
 ├── manifest.webmanifest
 ├── sw.js
@@ -95,16 +109,16 @@ For an existing Punjabi Quest repository:
 
 1. Export both students’ progress first.
 2. Unzip this folder.
-3. Upload everything inside `punjabi-quest-v1.2.1` to the root of the GitHub repository.
+3. Upload everything inside `punjabi-quest-v1.2.2` to the root of the GitHub repository.
 4. Commit changes.
 5. Wait 1 to 3 minutes for GitHub Pages to update.
-6. Open the app with a cache-busting URL if needed, for example `?v=121`.
+6. Open the app with a cache-busting URL if needed, for example `?v=122`.
 
 Do not upload the ZIP itself.
 
 ## Firebase setup notes
 
-This v1.2.1 package includes the Firebase Web app config that was already created for this project in:
+This v1.2.2 package includes the Firebase Web app config that was already created for this project in:
 
 ```text
 js/firebase-config.js
@@ -121,7 +135,7 @@ In Firebase Authentication, enable both:
 
 Google Sign-In is now shown directly in the app.
 
-### Firestore security rules for v1.2.1
+### Firestore security rules for v1.2.2
 
 Live Battle Mode stores match documents under each signed-in parent’s family document. Use these rules so the signed-in parent can read and write only their own family data, backups, devices, and battles:
 

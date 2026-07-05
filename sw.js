@@ -1,4 +1,4 @@
-const CACHE_NAME = 'punjabi-quest-v1-2-1';
+const CACHE_NAME = 'punjabi-quest-v1-2-2';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,11 @@ const ASSETS = [
   './assets/characters/papa-ji-guide.png',
   './assets/characters/papa-ji-correct.png',
   './assets/characters/papa-ji-incorrect.png',
-  './assets/characters/papa-ji-complete.png'
+  './assets/characters/papa-ji-complete.png',
+  './assets/characters/papa-ji-listening.png',
+  './assets/characters/papa-ji-thinking.png',
+  './assets/characters/papa-ji-battle.png',
+  './assets/characters/papa-ji-review.png'
 ];
 
 self.addEventListener('install', event => {

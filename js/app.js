@@ -20,7 +20,11 @@
     guide: 'assets/characters/papa-ji-guide.png',
     correct: 'assets/characters/papa-ji-correct.png',
     incorrect: 'assets/characters/papa-ji-incorrect.png',
-    complete: 'assets/characters/papa-ji-complete.png'
+    complete: 'assets/characters/papa-ji-complete.png',
+    listening: 'assets/characters/papa-ji-listening.png',
+    thinking: 'assets/characters/papa-ji-thinking.png',
+    battle: 'assets/characters/papa-ji-battle.png',
+    review: 'assets/characters/papa-ji-review.png'
   };
 
   function deepClone(obj){ return typeof structuredClone === 'function' ? structuredClone(obj) : JSON.parse(JSON.stringify(obj)); }
@@ -51,6 +55,8 @@
   let speechVoices = [];
   let traceCtx = null;
   let traceDrawing = false;
+  let activeRecognition = null;
+  let lastSpeechHeard = '';
   let cloud = {
     configured: false,
     initialized: false,
@@ -89,7 +95,7 @@
       skillStats: {},
       settings: {
         showTransliteration: false,
-        showEnglish: true,
+        showEnglish: false,
         slowAudio: false,
         voiceURI: '',
         speechRate: 0.86,
@@ -105,8 +111,9 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if(raw){
         const parsed = JSON.parse(raw);
-        parsed.version = parsed.version || '1.2.1';
+        parsed.version = parsed.version || '1.2.2';
         parsed.deviceId = parsed.deviceId || getDeviceId();
+        parsed.parentPin = parsed.parentPin || '';
         parsed.updatedAt = parsed.updatedAt || new Date().toISOString();
         parsed.profiles = parsed.profiles || {};
         for(const [id, p] of Object.entries(DEFAULT_PROFILES)){
@@ -116,7 +123,7 @@
         return parsed;
       }
     } catch(err){ console.warn('Could not load progress', err); }
-    return migrateLegacyState() || { version: '1.2.1', selectedProfileId: null, profiles: deepClone(DEFAULT_PROFILES), updatedAt: new Date().toISOString(), deviceId: getDeviceId() };
+    return migrateLegacyState() || { version: '1.2.2', selectedProfileId: null, profiles: deepClone(DEFAULT_PROFILES), parentPin: '', updatedAt: new Date().toISOString(), deviceId: getDeviceId() };
   }
 
   function mergeProgress(p){
@@ -137,7 +144,7 @@
 
   function saveState(options={}){
     try {
-      state.version = '1.2.1';
+      state.version = '1.2.2';
       state.updatedAt = new Date().toISOString();
       state.deviceId = state.deviceId || getDeviceId();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -151,6 +158,7 @@
     initConnectivityWatch();
     initCloud();
     if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(() => {}); }
+    document.addEventListener('click', handlePunjabiAudioClick, true);
     if(state.selectedProfileId && state.profiles[state.selectedProfileId]) {
       activeProfile = state.profiles[state.selectedProfileId];
       selectedWorldId = getCurrentWorldId(activeProfile.progress);
@@ -158,6 +166,17 @@
     } else {
       renderProfileSelector();
     }
+  }
+
+
+  function handlePunjabiAudioClick(e){
+    const el = e.target.closest && e.target.closest('.punjabi, [lang="pa"]');
+    if(!el || !APP.contains(el)) return;
+    if(e.target.closest('[data-choice], [data-tile], .story-token, [data-speak], [data-slow]')) return;
+    const text = (el.dataset.speak || el.textContent || '').trim();
+    if(!text) return;
+    // Let the normal button/choice behavior continue, but also make Punjabi tappable everywhere.
+    setTimeout(() => speak(text), 0);
   }
 
   function setupVoices(){
@@ -181,7 +200,7 @@
             <div class="logo-lockup">
               <div class="logo punjabi">ਪ</div>
               <div>
-                <div class="eyebrow">Punjabi Quest v1.2.1 · Guided by Papa Ji</div>
+                <div class="eyebrow">Punjabi Quest v1.2.2 · Guided by Papa Ji</div>
                 <h1>Choose your player</h1>
                 <p class="muted">Read, speak, listen, earn XP, and build Punjabi power.</p>
               </div>
@@ -200,9 +219,6 @@
                 <span class="lock-dot">${p.isGuest ? '✨ No PIN' : '🔒 PIN required'}</span>
               </button>
             `).join('')}
-          </div>
-          <div class="panel" style="margin-top:18px;background:#f7fff2;box-shadow:none;">
-            <strong>Parent note:</strong> Ages are not displayed anywhere in the app. Cloud sync is available after Firebase setup and parent login with Google or email/password.
           </div>
           <div class="cloud-card" style="margin-top:14px">
             <div><strong>☁️ Cloud sync:</strong> ${cloudStatusText()}</div>
@@ -231,7 +247,6 @@
         <input class="text-input" id="pinInput" inputmode="numeric" maxlength="4" type="password" placeholder="••••" aria-label="PIN" />
         <button class="btn primary" id="pinSubmit">Open</button>
       </div>
-      <p class="small">Parent hint: Sujaan uses 0815. Guntaas uses 0731.</p>
       <div class="button-row"><button class="btn secondary" data-close-modal>Cancel</button></div>
     `);
     const input = modal.querySelector('#pinInput');
@@ -278,6 +293,7 @@
       <main class="app-layout" id="mainView"></main>
       <nav class="tabs" aria-label="Main navigation">
         ${tabButton('learn','🛤️','Learn')}
+        ${tabButton('daily','⚡','Daily')}
         ${tabButton('practice','🎯','Review')}
         ${tabButton('alphabet','🔤','Letters')}
         ${tabButton('stories','📚','Stories')}
@@ -299,6 +315,7 @@
     if(!main) return;
     APP.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === activeTab));
     if(activeTab === 'learn') renderLearn(main);
+    if(activeTab === 'daily') renderDaily(main);
     if(activeTab === 'practice') renderPractice(main);
     if(activeTab === 'alphabet') renderAlphabet(main);
     if(activeTab === 'stories') renderStories(main);
@@ -334,6 +351,7 @@
           <div class="button-row">
             <button class="btn primary big" data-start="${h(current.id)}">Start next lesson</button>
             <button class="btn secondary big" data-action="due-review">Review due words</button>
+            <button class="btn mango big" data-action="daily-challenge">Daily Challenge</button>
           </div>
           ${papaInlineHtml('guide', 'Papa Ji says: start with the next lesson, or review weak words to make them stronger.')}
         </div>
@@ -363,6 +381,7 @@
     main.querySelectorAll('[data-world]').forEach(btn => btn.addEventListener('click', () => { selectedWorldId = btn.dataset.world; renderLearn(main); }));
     main.querySelectorAll('[data-start]').forEach(btn => btn.addEventListener('click', () => startLesson(btn.dataset.start)));
     main.querySelector('[data-action="due-review"]')?.addEventListener('click', () => startReviewSession());
+    main.querySelector('[data-action="daily-challenge"]')?.addEventListener('click', () => startDailyChallenge());
   }
 
   function lessonNode(lesson, p){
@@ -413,7 +432,57 @@
       const due = dueReviewItems().slice(0,3);
       due.forEach(item => ex.push(reviewToExercise(item)));
     }
-    return shuffle(ex).slice(0, lesson.number % 10 === 0 ? 10 : 7);
+
+    const cumulative = getCumulativeLessonContent(lesson);
+    if(cumulative.phrases.length || cumulative.words.length){
+      ex.push(buildProfileDialogueExercise(lesson, cumulative));
+    }
+    if(cumulative.words.length >= 3){
+      const oldWord = shuffle(cumulative.words)[0];
+      if(oldWord && !words.some(w => w.id === oldWord.id)) ex.push({type:'chooseMeaning', item:oldWord, prompt:'Review an earlier Punjabi word.', target:oldWord.english, choices:makeChoices(oldWord.english, randomVocab.map(v=>v.english))});
+    }
+    return shuffle(ex).slice(0, lesson.number % 10 === 0 ? 10 : 8);
+  }
+
+
+  function getCumulativeLessonContent(currentLesson){
+    const maxIndex = typeof currentLesson?.globalIndex === 'number' ? currentLesson.globalIndex : DATA.lessons.length;
+    const completed = new Set(activeProfile?.progress?.completedLessons || []);
+    const lessonPool = DATA.lessons.filter(l => completed.has(l.id) || l.globalIndex <= maxIndex);
+    return {
+      words: uniqueObjects(lessonPool.flatMap(l => l.words || []), x => x.id || x.gurmukhi),
+      phrases: uniqueObjects(lessonPool.flatMap(l => l.phrases || []), x => x.id || x.gurmukhi),
+      letters: uniqueObjects(lessonPool.flatMap(l => l.letters || []), x => x.letter || x.id)
+    };
+  }
+
+  function buildProfileDialogueExercise(lesson, cumulative){
+    const name = activeProfile?.name || 'Learner';
+    const gender = activeProfile?.id === 'guntaas' ? 'f' : 'm';
+    const phrase = shuffle((cumulative.phrases || []).filter(p => !p.gender || p.gender === 'both' || p.gender === gender))[0] || lesson.phrases?.[0];
+    const fallbackChoices = DATA.phrases.filter(p => !p.gender || p.gender === 'both' || p.gender === gender).map(p => p.gurmukhi);
+    const target = phrase?.gurmukhi || 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ।';
+    const speaker = dialogueSpeakerForLesson(lesson);
+    const prompt = dialoguePromptForLesson(lesson, speaker);
+    return { type:'profileDialogue', item: phrase, speaker, promptLine: prompt.pa, promptTr: prompt.tr, promptEn: prompt.en, prompt:'Choose your reply in Punjabi.', target, choices:makeChoices(target, fallbackChoices) };
+  }
+
+  function dialogueSpeakerForLesson(lesson){
+    const theme = lesson?.theme || DATA.worlds.find(w => w.id === lesson?.worldId)?.theme || '';
+    if(theme === 'family') return 'Dadi Ji';
+    if(theme === 'school') return 'Teacher';
+    if(theme === 'food') return 'Mummy';
+    if(theme === 'sikh') return 'Seva Uncle';
+    if(theme === 'culture') return 'Bhua Ji';
+    return 'Friend';
+  }
+
+  function dialoguePromptForLesson(lesson, speaker){
+    const theme = lesson?.theme || DATA.worlds.find(w => w.id === lesson?.worldId)?.theme || '';
+    if(theme === 'school') return {pa:'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ। ਤੂੰ ਸਕੂਲ ਜਾਂਦਾ ਹੈਂ?', tr:'Sat Sri Akaal. Tu school jaanda hain?', en:'Hello. Do you go to school?'};
+    if(theme === 'food') return {pa:'ਤੈਨੂੰ ਕੀ ਚਾਹੀਦਾ ਹੈ?', tr:'Tainu ki chaahida hai?', en:'What do you want?'};
+    if(theme === 'family') return {pa:'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ, ਬੱਚੇ। ਤੂੰ ਕਿਵੇਂ ਹੈਂ?', tr:'Sat Sri Akaal, bachche. Tu kiven hain?', en:'Hello, child. How are you?'};
+    return {pa:'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ। ਤੂੰ ਕਿਵੇਂ ਹੈਂ?', tr:'Sat Sri Akaal. Tu kiven hain?', en:'Hello. How are you?'};
   }
 
   function reviewToExercise(ri){
@@ -449,6 +518,9 @@
     lessonSession.selected = null;
     lessonSession.built = [];
     lessonSession.checked = false;
+    lessonSession.speechAttempts = 0;
+    lessonSession.speechActive = false;
+    lastSpeechHeard = '';
     let body = '';
     if(ex.type === 'chooseMeaning') body = chooseMeaningHtml(ex);
     if(ex.type === 'choosePunjabi') body = choosePunjabiHtml(ex);
@@ -457,6 +529,7 @@
     if(ex.type === 'tileSentence') body = tileSentenceHtml(ex);
     if(ex.type === 'speakPhrase') body = speakPhraseHtml(ex);
     if(ex.type === 'typePunjabi') body = typePunjabiHtml(ex);
+    if(ex.type === 'profileDialogue') body = profileDialogueHtml(ex);
     card.innerHTML = body + feedbackHtml();
     bindExerciseEvents(ex);
     if(ex.type === 'listenChoose') setTimeout(() => speak(getItemPunjabi(ex.item)), 300);
@@ -471,10 +544,10 @@
     </div>`;
   }
   function itemHelp(item){
-    return `<div class="translation">${h(item.english || '')}</div><div class="translit">${h(item.translit || item.tr || '')}</div>`;
+    return `<div class="translit">${h(item.translit || item.tr || '')}</div><div class="translation">${h(item.english || item.en || '')}</div>`;
   }
   function audioButtons(text){
-    return `<div class="audio-row"><button class="btn secondary" data-speak="${h(text)}">🔊 Listen</button><button class="btn secondary" data-slow="${h(text)}">🐢 Slow</button><button class="btn ghost" data-toggle-translit>Show transliteration</button></div>`;
+    return `<div class="audio-row"><button class="btn secondary" data-speak="${h(text)}">🔊 Listen</button><button class="btn secondary" data-slow="${h(text)}">🐢 Slow</button><button class="btn ghost" data-toggle-translit>Show Transliteration</button><button class="btn ghost" data-toggle-translation>Show Translation</button></div>`;
   }
 
   function papaImage(kind='guide', alt='Papa Ji'){
@@ -494,9 +567,10 @@
   }
 
   function papaInlineHtml(kind='guide', message=''){
+    const clean = String(message || '').replace(/^Papa Ji\s*(says:|says|:)\s*/i, '');
     return `<div class="papa-inline papa-inline-${h(kind)}">
       <div class="papa-mini">${papaImage(kind, `Papa Ji ${kind}`)}</div>
-      <div><strong>Papa Ji:</strong> ${h(message)}</div>
+      <div><strong>Papa Ji says:</strong> ${h(clean)}</div>
     </div>`;
   }
 
@@ -523,8 +597,14 @@
     const bank = shuffle(words);
     return `${promptBlock(ex)}<div class="prompt">${h(ex.item.english)}</div>${audioButtons(ex.target)}<div class="answer-bank" id="answerBank"></div><div class="word-bank">${bank.map((w,i)=>`<button class="tile punjabi" lang="pa" data-tile-index="${i}" data-tile="${h(w)}">${h(w)}</button>`).join('')}</div><div class="lesson-bottom"><button class="btn secondary" data-action="clear-tiles">Clear</button><button class="btn primary" data-action="check">Check</button></div>`;
   }
+
+  function profileDialogueHtml(ex){
+    const learner = activeProfile?.name || 'Learner';
+    return `${promptBlock(ex)}<div class="dialogue-line app"><strong>${h(ex.speaker)}:</strong><p class="punjabi" lang="pa">${h(ex.promptLine)}</p><p class="translit">${h(ex.promptTr)}</p><p class="translation">${h(ex.promptEn)}</p></div><div class="dialogue-line user"><strong>${h(learner)}:</strong><p class="muted">Choose your Punjabi reply.</p></div>${audioButtons(ex.promptLine)}<div class="choice-grid">${ex.choices.map(c=>`<button class="choice punjabi" lang="pa" data-choice="${h(c)}">${h(c)}</button>`).join('')}</div><div class="lesson-bottom"><button class="btn ghost" data-action="skip">Skip</button><button class="btn primary" data-action="check">Check</button></div>`;
+  }
+
   function speakPhraseHtml(ex){
-    return `${promptBlock(ex)}<div class="prompt punjabi" lang="pa">${h(ex.target)}</div>${itemHelp(ex.item)}${audioButtons(ex.target)}<div class="panel" style="box-shadow:none;background:#fbfff9"><strong>Speaking practice:</strong> press the microphone if supported, or say it out loud and tap “I said it.”<div class="button-row" style="margin-top:12px"><button class="btn blue" data-action="listen-mic">🎤 Try microphone</button><button class="btn primary" data-action="manual-said">I said it</button></div><p id="speechResult" class="small"></p></div><div class="lesson-bottom"><button class="btn ghost" data-action="skip">Skip</button><button class="btn primary" data-action="check" disabled>Continue</button></div>`;
+    return `${promptBlock(ex)}<div class="prompt punjabi" lang="pa">${h(ex.target)}</div>${itemHelp(ex.item)}${audioButtons(ex.target)}<div class="panel speaking-panel" style="box-shadow:none;background:#fbfff9"><strong>Speaking practice:</strong> listen first, then press <strong>Speak</strong>. The button changes to <strong>Check</strong> while the microphone is active.<div class="button-row" style="margin-top:12px"><button class="btn blue" data-action="listen-mic">🎤 Speak</button></div><p id="speechResult" class="speech-result">Heard: —</p><p class="small">You get up to 3 tries. Listen again before retrying if needed.</p></div><div class="lesson-bottom"><button class="btn ghost" data-action="skip">Skip</button><button class="btn primary" data-action="check" disabled>Check</button></div>`;
   }
   function typePunjabiHtml(ex){
     return `${promptBlock(ex)}<div class="prompt" style="text-align:center">Listen, then type or copy the Punjabi phrase.</div>${audioButtons(ex.target)}<input class="text-input punjabi" lang="pa" id="typedAnswer" placeholder="Type Punjabi here"/><div class="lesson-bottom"><button class="btn ghost" data-action="skip">Skip</button><button class="btn primary" data-action="check">Check</button></div>`;
@@ -534,10 +614,11 @@
   function bindExerciseEvents(ex){
     APP.querySelectorAll('[data-speak]').forEach(btn => btn.addEventListener('click', () => speak(btn.dataset.speak)));
     APP.querySelectorAll('[data-slow]').forEach(btn => btn.addEventListener('click', () => speak(btn.dataset.slow, {slow:true})));
-    APP.querySelectorAll('[data-toggle-translit]').forEach(btn => btn.addEventListener('click', () => { APP.querySelector('.lesson-screen')?.classList.toggle('show-translit'); btn.textContent = APP.querySelector('.lesson-screen')?.classList.contains('show-translit') ? 'Hide transliteration' : 'Show transliteration'; }));
+    APP.querySelectorAll('[data-toggle-translit]').forEach(btn => btn.addEventListener('click', () => { const root=APP.querySelector('.lesson-screen') || APP.querySelector('#mainView') || APP; root.classList.toggle('show-translit'); btn.textContent = root.classList.contains('show-translit') ? 'Hide Transliteration' : 'Show Transliteration'; }));
+    APP.querySelectorAll('[data-toggle-translation]').forEach(btn => btn.addEventListener('click', () => { const root=APP.querySelector('.lesson-screen') || APP.querySelector('#mainView') || APP; root.classList.toggle('show-translation'); btn.textContent = root.classList.contains('show-translation') ? 'Hide Translation' : 'Show Translation'; }));
     APP.querySelectorAll('[data-choice]').forEach(btn => btn.addEventListener('click', () => {
       APP.querySelectorAll('.choice').forEach(c => c.classList.remove('selected'));
-      btn.classList.add('selected'); lessonSession.selected = btn.dataset.choice;
+      btn.classList.add('selected'); lessonSession.selected = btn.dataset.choice; if(btn.classList.contains('punjabi')) speak(btn.dataset.choice);
     }));
     APP.querySelectorAll('[data-tile]').forEach(btn => btn.addEventListener('click', () => {
       if(btn.classList.contains('used')) return;
@@ -546,8 +627,7 @@
       renderBuiltTiles();
     }));
     APP.querySelector('[data-action="clear-tiles"]')?.addEventListener('click', () => { lessonSession.built = []; APP.querySelectorAll('[data-tile]').forEach(b=>b.classList.remove('used')); renderBuiltTiles(); });
-    APP.querySelector('[data-action="listen-mic"]')?.addEventListener('click', () => startSpeechRecognition(ex));
-    APP.querySelector('[data-action="manual-said"]')?.addEventListener('click', () => { lessonSession.selected = ex.target; const btn=APP.querySelector('[data-action="check"]'); if(btn) btn.disabled=false; toast('Speaking effort saved. Shabash!'); });
+    APP.querySelector('[data-action="listen-mic"]')?.addEventListener('click', () => handleSpeechButton(ex));
     APP.querySelector('[data-action="check"]')?.addEventListener('click', () => checkExercise(ex));
     APP.querySelector('[data-action="skip"]')?.addEventListener('click', () => { markAnswer(ex, false, true); });
   }
@@ -568,6 +648,7 @@
 
   function checkExercise(ex){
     if(lessonSession.checked){ nextExercise(); return; }
+    if(ex.type === 'speakPhrase') { evaluateSpeechExercise(ex); return; }
     let answer = lessonSession.selected;
     if(ex.type === 'tileSentence') answer = lessonSession.built.join(' ') + (/[।?]$/.test(ex.target) ? ex.target.slice(-1) : '');
     if(ex.type === 'typePunjabi') answer = document.getElementById('typedAnswer')?.value || '';
@@ -577,14 +658,15 @@
 
   function markAnswer(ex, correct, skipped=false, answer=''){
     lessonSession.checked = true;
+    playAnswerSound(correct);
     if(correct){ lessonSession.correct++; lessonSession.xp += 5; strengthenItem(ex.item || ex, true); }
     else { lessonSession.wrong++; lessonSession.hearts = Math.max(1, lessonSession.hearts - 1); strengthenItem(ex.item || ex, false); addMistake(ex, answer, skipped); }
     const fb = document.getElementById('feedback');
     if(fb){
       fb.className = `feedback show ${correct?'good':'bad'}`;
       fb.innerHTML = correct
-        ? papaFeedbackHtml('correct', 'Yay!', `Punjabi Power +5 XP. ${getEncouragement()}`)
-        : papaFeedbackHtml('incorrect', 'Oh No!', 'No worries. Mistakes help us learn. Try again together.', `<p>Correct answer: <span class="punjabi" lang="pa">${h(ex.target)}</span></p><p class="small">This will come back in review.</p>`);
+        ? papaFeedbackHtml('correct', 'Yay!', `Punjabi Power +5 XP. ${getCorrectFeedback()}`)
+        : papaFeedbackHtml('incorrect', 'Oh No!', getIncorrectFeedback(), `<p>Correct answer: <span class="punjabi" lang="pa">${h(ex.target)}</span></p><p class="small">This will come back in review.</p>`);
     }
     APP.querySelectorAll('.choice').forEach(c => {
       if(normalize(c.dataset.choice) === normalize(ex.target)) c.classList.add('correct');
@@ -610,7 +692,7 @@
     p.coins += coins;
     const isCourseLesson = lessonSession.mode === 'lesson';
     if(isCourseLesson && !p.completedLessons.includes(lesson.id)) p.completedLessons.push(lesson.id);
-    p.lessonScores[lesson.id] = { accuracy, completedAt: new Date().toISOString(), wrong: lessonSession.wrong, correct: lessonSession.correct, mode: lessonSession.mode };
+    p.lessonScores[lesson.id] = { accuracy, completedAt: new Date().toISOString(), wrong: lessonSession.wrong, correct: lessonSession.correct, mode: lessonSession.mode, awardedXp: baseXp, awardedCoins: coins };
     updateStreak(p);
     updateBadges(p, lesson, accuracy);
     saveState();
@@ -709,6 +791,44 @@
     renderLessonScreen();
   }
 
+
+  function renderDaily(main){
+    const completedCount = activeProfile.progress.completedLessons.length;
+    const available = getCompletedLessonContent();
+    main.innerHTML = `<section class="hero-card daily-card"><div class="eyebrow">Daily Challenge</div><h1>Mix yesterday’s Punjabi with today’s power</h1><p class="muted">Daily Challenge only uses completed lessons. It mixes old words, sentences, listening, and speaking in new ways.</p>${papaInlineHtml('review', completedCount ? 'review completed lessons, then use old Punjabi in new combinations.' : 'complete your first lesson to unlock Daily Challenge.')}<div class="button-row"><button class="btn primary big" data-action="start-daily" ${completedCount ? '' : 'disabled'}>Start Daily Challenge</button><button class="btn secondary big" data-action="due-review">Review due words</button></div><p class="small">Unlocked content: ${completedCount} completed lessons · ${available.words.length} words · ${available.phrases.length} phrases</p></section>`;
+    main.querySelector('[data-action="start-daily"]')?.addEventListener('click', startDailyChallenge);
+    main.querySelector('[data-action="due-review"]')?.addEventListener('click', startReviewSession);
+  }
+
+  function getCompletedLessonContent(){
+    const completed = new Set(activeProfile?.progress?.completedLessons || []);
+    const lessons = DATA.lessons.filter(l => completed.has(l.id));
+    return {
+      lessons,
+      words: uniqueObjects(lessons.flatMap(l => l.words || []), x => x.id || x.gurmukhi),
+      phrases: uniqueObjects(lessons.flatMap(l => l.phrases || []), x => x.id || x.gurmukhi),
+      letters: uniqueObjects(lessons.flatMap(l => l.letters || []), x => x.letter || x.id)
+    };
+  }
+
+  function startDailyChallenge(){
+    const available = getCompletedLessonContent();
+    if(!available.lessons.length){ toast('Complete one lesson first.'); activeTab='learn'; renderApp(); return; }
+    const fakeLesson = { id:'daily-'+TODAY(), title:'Daily Challenge', xp:35, coins:12, worldId:selectedWorldId, globalIndex:-1, estimatedMinutes:6 };
+    const exercises = [];
+    const words = shuffle(available.words).slice(0,5);
+    words.slice(0,2).forEach(w => exercises.push({type:'chooseMeaning', item:w, prompt:'Daily mix: what does this mean?', target:w.english, choices:makeChoices(w.english, available.words.map(v=>v.english).concat(DATA.vocab.map(v=>v.english)))}));
+    if(words[2]) exercises.push({type:'choosePunjabi', item:words[2], prompt:'Daily mix: choose the Punjabi word.', target:words[2].gurmukhi, choices:makeChoices(words[2].gurmukhi, available.words.map(v=>v.gurmukhi))});
+    if(words[3]) exercises.push({type:'listenChoose', item:words[3], prompt:'Daily listening: choose what you heard.', target:words[3].gurmukhi, choices:makeChoices(words[3].gurmukhi, available.words.map(v=>v.gurmukhi))});
+    const phrases = shuffle(available.phrases).slice(0,4);
+    if(phrases[0]) exercises.push({type:'tileSentence', item:phrases[0], prompt:'Daily sentence builder.', target:phrases[0].gurmukhi});
+    if(phrases[1]) exercises.push({type:'speakPhrase', item:phrases[1], prompt:'Daily speaking challenge.', target:phrases[1].gurmukhi});
+    if(available.lessons[0]) exercises.push(buildProfileDialogueExercise(available.lessons[available.lessons.length-1], available));
+    const due = dueReviewItems().slice(0,3); due.forEach(item => exercises.push(reviewToExercise(item)));
+    lessonSession = { mode:'daily', lesson:fakeLesson, index:0, hearts:5, xp:0, coins:0, correct:0, wrong:0, selected:null, built:[], checked:false, exercises:shuffle(exercises).slice(0,10) };
+    renderLessonScreen();
+  }
+
   function renderPractice(main){
     const due = dueReviewItems();
     const p = activeProfile.progress;
@@ -750,7 +870,7 @@
   }
 
   function letterCard(a){
-    return `<article class="letter-card"><div class="big-letter punjabi" lang="pa">${h(a.letter)}</div><h3>${h(a.name)}</h3><p><strong>Sound:</strong> ${h(a.sound)}</p><p><span class="punjabi" lang="pa">${h(a.word)}</span> · ${h(a.meaning)} ${h(a.emoji)}</p><p class="translit visible">${h(a.wordTranslit)}</p><div class="button-row"><button class="btn secondary" data-speak="${h(a.letter + '. ' + a.word)}">🔊 Word</button><button class="btn ghost" data-speak="${h(a.name)}">Name</button></div></article>`;
+    return `<article class="letter-card"><div class="big-letter punjabi" lang="pa">${h(a.letter)}</div><h3>${h(a.name)}</h3><p><strong>Sound:</strong> ${h(a.sound)}</p><p><span class="punjabi" lang="pa">${h(a.word)}</span> · ${h(a.meaning)} ${h(a.emoji)}</p><p class="translit visible">${h(a.wordTranslit)}</p><div class="button-row"><button class="btn secondary" data-speak="${h(a.word)}">🔊 Word</button><button class="btn ghost" data-speak="${h(a.namePunjabi || a.name)}">Name</button><button class="btn ghost" data-speak="${h(a.sound)}">Sound</button></div></article>`;
   }
 
   function bindAlphabetEvents(main){
@@ -760,7 +880,7 @@
     const sel = main.querySelector('#traceLetter');
     sel.addEventListener('change', () => { document.getElementById('traceGuide').textContent = sel.value; clearTrace(); });
     main.querySelector('[data-action="clear-trace"]').addEventListener('click', clearTrace);
-    main.querySelector('[data-action="speak-trace"]').addEventListener('click', () => speak(sel.value));
+    main.querySelector('[data-action="speak-trace"]').addEventListener('click', () => { const a = ALPHABET.find(x => x.letter === sel.value); speak(a ? `${a.namePunjabi || a.name}. ${a.sound}. ${a.word}` : sel.value); });
     setupTraceCanvas();
   }
 
@@ -811,8 +931,8 @@
 
   function renderStoryScreen(showQuiz=false){
     const s = storySession.story;
-    APP.innerHTML = `<main class="lesson-screen ${activeProfile.progress.settings.showTransliteration?'show-translit':''}"><section class="lesson-card show-english">
-      <div class="button-row"><button class="btn secondary" data-exit-story>Back</button><button class="btn primary" data-speak-story>🔊 Read aloud</button><button class="btn ghost" data-toggle-translit>Show transliteration</button><button class="btn ghost" data-toggle-english>Hide English</button></div>
+    APP.innerHTML = `<main class="lesson-screen ${activeProfile.progress.settings.showTransliteration?'show-translit':''}"><section class="lesson-card">
+      <div class="button-row"><button class="btn secondary" data-exit-story>Back</button><button class="btn primary" data-speak-story>🔊 Read aloud</button><button class="btn ghost" data-toggle-translit>Show transliteration</button><button class="btn ghost" data-toggle-translation>Show Translation</button></div>
       <div class="eyebrow">Story Quest</div><h1>${h(s.emoji)} ${h(s.title)}</h1>
       ${s.lines.map(line => `<div class="story-line"><p class="punjabi" lang="pa" style="font-size:28px">${tokenizeLine(line.pa)}</p><p class="translit">${h(line.tr)}</p><p class="hidden-translation muted">${h(line.en)}</p></div>`).join('')}
       <div class="button-row"><button class="btn primary big" data-start-story-quiz>Start quiz</button></div>
@@ -821,7 +941,7 @@
     APP.querySelector('[data-exit-story]').addEventListener('click', () => { storySession=null; activeTab='stories'; renderApp(); });
     APP.querySelector('[data-speak-story]').addEventListener('click', () => speak(s.lines.map(l=>l.pa).join(' ')));
     APP.querySelector('[data-toggle-translit]').addEventListener('click', e => { APP.querySelector('.lesson-screen').classList.toggle('show-translit'); e.currentTarget.textContent = APP.querySelector('.lesson-screen').classList.contains('show-translit') ? 'Hide transliteration' : 'Show transliteration'; });
-    APP.querySelector('[data-toggle-english]').addEventListener('click', e => { APP.querySelector('.lesson-card').classList.toggle('show-english'); e.currentTarget.textContent = APP.querySelector('.lesson-card').classList.contains('show-english') ? 'Hide English' : 'Show English'; });
+    APP.querySelector('[data-toggle-translation]').addEventListener('click', e => { APP.querySelector('.lesson-card').classList.toggle('show-translation'); e.currentTarget.textContent = APP.querySelector('.lesson-card').classList.contains('show-translation') ? 'Hide Translation' : 'Show Translation'; });
     APP.querySelector('[data-start-story-quiz]').addEventListener('click', renderStoryQuiz);
     APP.querySelectorAll('.story-token').forEach(tok => tok.addEventListener('click', () => speak(tok.textContent)));
   }
@@ -839,6 +959,7 @@
     APP.querySelectorAll('[data-choice]').forEach(btn => btn.addEventListener('click', () => { selected=btn.dataset.choice; APP.querySelectorAll('.choice').forEach(b=>b.classList.remove('selected')); btn.classList.add('selected'); }));
     APP.querySelector('[data-check-story]').addEventListener('click', () => {
       const correct = selected === q.a;
+      playAnswerSound(correct);
       if(correct) storySession.correct++;
       const fb = document.getElementById('feedback');
       fb.className = `feedback show ${correct?'good':'bad'}`;
@@ -888,9 +1009,9 @@
     const turn = c.turns[convoSession.index];
     if(!turn){ completeConversation(); return; }
     APP.innerHTML = `<main class="lesson-screen show-translit"><section class="lesson-card">
-      <div class="button-row"><button class="btn secondary" data-exit-convo>Back</button><button class="btn primary" data-speak="${h(turn.app)}">🔊 App speaks</button></div>
+      <div class="button-row"><button class="btn secondary" data-exit-convo>Back</button><button class="btn primary" data-speak="${h(turn.app)}">🔊 Listen</button></div>
       <div class="eyebrow">Conversation ${convoSession.index+1} of ${c.turns.length}</div><h1>${h(c.emoji)} ${h(c.title)}</h1>
-      <div class="dialogue-line app"><strong>Papa Ji:</strong><p class="punjabi" lang="pa" style="font-size:30px">${h(turn.app)}</p><p class="translit">${h(turn.tr)}</p><p class="muted">${h(turn.en)}</p></div>
+      <div class="dialogue-line app"><strong>${h(convoSession.convo.speaker || 'Friend')}:</strong><p class="punjabi" lang="pa" style="font-size:30px">${h(turn.app)}</p><p class="translit">${h(turn.tr)}</p><p class="translation">${h(turn.en)}</p></div>
       ${papaInlineHtml('guide', 'Choose the reply that sounds natural for this conversation.')}
       <h2>Choose the best reply</h2><div class="choice-grid">${turn.choices.map(ch => `<button class="choice" data-choice="${h(ch.pa)}" data-correct="${ch.correct?'1':'0'}"><span class="punjabi" lang="pa">${h(ch.pa)}</span><br><span class="small">${h(ch.en)}</span></button>`).join('')}</div>
       <div id="feedback" class="feedback"></div><div class="lesson-bottom"><button class="btn blue" data-action="speak-answer">🎤 Say answer</button><button class="btn primary" data-action="check-convo">Check</button></div>
@@ -907,7 +1028,7 @@
       fb.className = `feedback show ${correct?'good':'bad'}`;
       fb.innerHTML = correct
         ? papaFeedbackHtml('correct', 'Yay!', 'Perfect reply. This fits the conversation.')
-        : papaFeedbackHtml('incorrect', 'Oh No!', 'Papa Ji says this reply fits better here.', `<p>Best reply: <span class="punjabi">${h(turn.choices.find(x=>x.correct)?.pa || '')}</span></p>`);
+        : papaFeedbackHtml('incorrect', 'Oh No!', 'this reply fits better here.', `<p>Best reply: <span class="punjabi">${h(turn.choices.find(x=>x.correct)?.pa || '')}</span></p>`);
       setTimeout(() => { convoSession.index++; renderConversationTurn(); }, 1100);
     });
     setTimeout(() => speak(turn.app), 250);
@@ -1125,7 +1246,7 @@
     const fb = document.getElementById('battleFeedback');
     if(fb){
       fb.className = `feedback show ${correct ? 'good' : 'bad'}`;
-      fb.innerHTML = correct ? papaFeedbackHtml('correct', 'Yay!', '+1 point. Khanda Shield power!') : papaFeedbackHtml('incorrect', 'Oh No!', '-1 point, but Papa Ji says keep going.', `<p>Correct answer: <strong>${h(q.target)}</strong></p>`);
+      fb.innerHTML = correct ? papaFeedbackHtml('correct', 'Yay!', '+1 point. Khanda Shield power!') : papaFeedbackHtml('incorrect', 'Oh No!', '-1 point, but keep going.', `<p>Correct answer: <strong>${h(q.target)}</strong></p>`);
     }
     APP.querySelectorAll('[data-battle-choice]').forEach(btn => { btn.disabled = true; if(normalize(btn.dataset.battleChoice) === normalize(q.target)) btn.classList.add('correct'); else if(btn.dataset.battleChoice === choice) btn.classList.add('wrong'); });
     try {
@@ -1207,7 +1328,16 @@
     if(activeProfile.isGuest){
       return `<p class="muted">Guest progress is temporary. Save it as a new profile to keep it separate.</p><div class="grid" style="max-width:440px"><input class="text-input" id="newProfileName" placeholder="New profile name"><input class="text-input" id="newProfilePin" placeholder="4-digit PIN" inputmode="numeric" maxlength="4"><button class="btn primary" data-save-guest>Save Guest as profile</button></div>`;
     }
-    return `<div class="button-row"><button class="btn danger" data-reset-profile>Reset this profile</button></div>`;
+    const completed = (activeProfile.progress.completedLessons || []).map(id => DATA.lessons.find(l => l.id === id)).filter(Boolean);
+    return `<div class="grid" style="max-width:620px">
+      <div class="button-row"><button class="btn secondary" data-set-parent-pin>${state.parentPin ? 'Change parent PIN' : 'Create parent PIN'}</button></div>
+      <p class="small">Lesson reset is parent protected. The PIN is never displayed.</p>
+      <select class="text-input" id="resetLessonSelect">
+        <option value="">Choose completed lesson to reset</option>
+        ${completed.map(l => `<option value="${h(l.id)}">${h(l.levelLabel)} · ${h(l.title)}</option>`).join('')}
+      </select>
+      <div class="button-row"><button class="btn danger" data-reset-lesson ${completed.length?'':'disabled'}>Reset selected lesson</button><button class="btn danger" data-reset-profile>Reset this profile</button></div>
+    </div>`;
   }
 
   function bindParentEvents(main){
@@ -1219,6 +1349,8 @@
     main.querySelector('[data-audio-settings]').addEventListener('click', showAudioSettings);
     main.querySelector('[data-save-guest]')?.addEventListener('click', saveGuestAsProfile);
     main.querySelector('[data-reset-profile]')?.addEventListener('click', resetProfile);
+    main.querySelector('[data-set-parent-pin]')?.addEventListener('click', setParentPin);
+    main.querySelector('[data-reset-lesson]')?.addEventListener('click', resetSelectedLesson);
     main.querySelector('[data-cloud-login]')?.addEventListener('click', showCloudLoginModal);
     main.querySelector('[data-cloud-backup]')?.addEventListener('click', () => createCloudBackup(true));
     main.querySelector('[data-cloud-push]')?.addEventListener('click', enablePushNotifications);
@@ -1635,9 +1767,48 @@
     selectProfile(id);
   }
 
+
+  function setParentPin(){
+    const modal = createModal(`<div class="eyebrow">Parent PIN</div><h2>${state.parentPin ? 'Change' : 'Create'} parent PIN</h2><p class="muted">Use a private 4-digit PIN for parent-only lesson reset controls. The PIN will not be shown anywhere in the app.</p><input class="text-input" id="parentPinNew" inputmode="numeric" maxlength="4" type="password" placeholder="New 4-digit PIN"><div class="button-row" style="margin-top:14px"><button class="btn primary" id="saveParentPin">Save PIN</button><button class="btn ghost" data-close-modal>Cancel</button></div>`);
+    modal.querySelector('#saveParentPin').addEventListener('click', () => {
+      const val = modal.querySelector('#parentPinNew').value.trim();
+      if(!/^\d{4}$/.test(val)){ toast('Enter a 4-digit PIN.'); return; }
+      state.parentPin = val;
+      saveState(); closeModal(); renderApp(); toast('Parent PIN saved.');
+    });
+  }
+
+  function requireParentPin(onSuccess){
+    if(!state.parentPin){ toast('Create a parent PIN first.'); setParentPin(); return; }
+    const modal = createModal(`<div class="eyebrow">Parent protected</div><h2>Enter parent PIN</h2><p class="muted">This action changes student progress.</p><input class="text-input" id="parentPinCheck" inputmode="numeric" maxlength="4" type="password" placeholder="Parent PIN"><div class="button-row" style="margin-top:14px"><button class="btn danger" id="confirmParentPin">Continue</button><button class="btn ghost" data-close-modal>Cancel</button></div>`);
+    modal.querySelector('#confirmParentPin').addEventListener('click', () => {
+      if(modal.querySelector('#parentPinCheck').value.trim() !== state.parentPin){ toast('Parent PIN did not match.'); return; }
+      closeModal(); onSuccess();
+    });
+  }
+
+  function resetSelectedLesson(){
+    const lessonId = document.getElementById('resetLessonSelect')?.value;
+    if(!lessonId){ toast('Choose a completed lesson first.'); return; }
+    const lesson = DATA.lessons.find(l => l.id === lessonId);
+    if(!lesson) return;
+    requireParentPin(() => {
+      const p = activeProfile.progress;
+      const score = p.lessonScores[lessonId] || {};
+      p.completedLessons = (p.completedLessons || []).filter(id => id !== lessonId);
+      p.xp = Math.max(0, (p.xp || 0) - Number(score.awardedXp || lesson.xp || 0));
+      p.coins = Math.max(0, (p.coins || 0) - Number(score.awardedCoins || lesson.coins || 0));
+      delete p.lessonScores[lessonId];
+      p.mistakes = (p.mistakes || []).filter(m => m.lessonId !== lessonId);
+      const lessonItems = [...(lesson.words||[]), ...(lesson.phrases||[])];
+      lessonItems.forEach(item => { const id = item.id || item.gurmukhi || item.pa; delete p.knownItems[id]; delete p.reviewItems[id]; });
+      saveState(); renderApp(); toast(`${lesson.title} reset to unattempted.`);
+    });
+  }
+
   function resetProfile(){
     createModal(`<h2>Reset ${h(activeProfile.name)}?</h2><p class="muted">This clears lessons, XP, coins, reviews, and badges for this profile. If cloud sync is on, the reset also syncs to your family cloud account.</p><div class="button-row"><button class="btn danger" id="confirmReset">Reset</button><button class="btn secondary" data-close-modal>Cancel</button></div>`);
-    document.getElementById('confirmReset').addEventListener('click', () => { activeProfile.progress = emptyProgress(activeProfile.isGuest); saveState(); closeModal(); renderApp(); });
+    document.getElementById('confirmReset').addEventListener('click', () => requireParentPin(() => { activeProfile.progress = emptyProgress(activeProfile.isGuest); saveState(); closeModal(); renderApp(); }));
   }
 
   function showAudioSettings(){
@@ -1645,6 +1816,69 @@
     createModal(`<div class="eyebrow">Audio setup</div><h2>Spoken Punjabi</h2><p class="muted">The app uses any Punjabi-capable voice on this device. If there is no Punjabi voice, it falls back to the closest available voice.</p><select class="text-input" id="voiceSelect"><option value="">Auto select best voice</option>${voices.map(v=>`<option value="${h(v.voiceURI)}" ${activeProfile.progress.settings.voiceURI===v.voiceURI?'selected':''}>${h(v.name)} · ${h(v.lang)}</option>`).join('')}</select><div class="button-row" style="margin-top:14px"><button class="btn primary" id="saveVoice">Save</button><button class="btn secondary" id="testVoice">Test Punjabi</button><button class="btn ghost" data-close-modal>Close</button></div><p class="small">Tip: on iPad, Punjabi voice availability depends on installed system voices.</p>`);
     document.getElementById('saveVoice').addEventListener('click', () => { activeProfile.progress.settings.voiceURI = document.getElementById('voiceSelect').value; saveState(); toast('Voice setting saved.'); });
     document.getElementById('testVoice').addEventListener('click', () => speak('ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ। ਮੈਨੂੰ ਪੰਜਾਬੀ ਆਉਂਦੀ ਹੈ।'));
+  }
+
+
+  function playAnswerSound(correct){
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if(!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = correct ? 'sine' : 'triangle';
+      osc.frequency.value = correct ? 660 : 180;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (correct ? 0.16 : 0.24));
+      osc.start(); osc.stop(ctx.currentTime + (correct ? 0.18 : 0.26));
+    } catch(err){}
+  }
+
+  function handleSpeechButton(ex){
+    const btn = APP.querySelector('[data-action="listen-mic"]');
+    if(lessonSession.speechActive){
+      if(activeRecognition) { try { activeRecognition.stop(); } catch(e){} }
+      lessonSession.speechActive = false;
+      if(btn) btn.textContent = '🎤 Speak';
+      const check = APP.querySelector('[data-action="check"]'); if(check) check.disabled = false;
+      return;
+    }
+    startSpeechRecognition(ex);
+  }
+
+  function evaluateSpeechExercise(ex){
+    const heard = lastSpeechHeard || lessonSession.selected || '';
+    const correct = isSpeechMatch(heard, ex.target);
+    const out = document.getElementById('speechResult');
+    if(out){
+      out.textContent = heard ? `Heard: ${heard}` : 'Heard: —';
+      out.classList.toggle('speech-correct', correct);
+      out.classList.toggle('speech-incorrect', !correct);
+    }
+    if(correct){ markAnswer(ex, true, false, heard); return; }
+    lessonSession.speechAttempts = (lessonSession.speechAttempts || 0) + 1;
+    playAnswerSound(false);
+    if(lessonSession.speechAttempts < 3){
+      const fb = document.getElementById('feedback');
+      if(fb){ fb.className='feedback show bad'; fb.innerHTML = papaFeedbackHtml('incorrect', 'Oh No!', 'Listen once more, then try speaking again.'); }
+      const check = APP.querySelector('[data-action="check"]'); if(check){ check.disabled = true; check.textContent = 'Check'; }
+      return;
+    }
+    markAnswer(ex, false, false, heard);
+  }
+
+  function isSpeechMatch(heard, target){
+    const hrd = normalize(heard);
+    const tgt = normalize(target);
+    if(!hrd || !tgt) return false;
+    if(hrd === tgt || hrd.includes(tgt) || tgt.includes(hrd)) return true;
+    const hWords = new Set(hrd.split(' ').filter(Boolean));
+    const tWords = tgt.split(' ').filter(Boolean);
+    if(!tWords.length) return false;
+    const hits = tWords.filter(w => hWords.has(w)).length;
+    return hits / tWords.length >= 0.75;
   }
 
   function speak(text, opts={}){
@@ -1664,23 +1898,36 @@
   function startSpeechRecognition(ex){
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const out = document.getElementById('speechResult');
+    const micBtn = APP.querySelector('[data-action="listen-mic"]');
     if(!Recognition){
-      if(out) out.textContent = 'Microphone speech recognition is not supported here. Use “I said it” or choose an answer.';
+      if(out){ out.textContent = 'Speech recognition is not supported in this browser. Please try on Chrome or use another device.'; out.classList.add('speech-incorrect'); }
       toast('Speech recognition not supported in this browser.'); return;
     }
     try {
+      if(activeRecognition){ try{ activeRecognition.stop(); }catch(e){} }
       const rec = new Recognition();
-      rec.lang = 'pa-IN'; rec.interimResults = false; rec.maxAlternatives = 3;
-      if(out) out.textContent = 'Listening...';
+      activeRecognition = rec;
+      rec.lang = 'pa-IN'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 3;
+      lessonSession.speechActive = true;
+      lastSpeechHeard = '';
+      if(out){ out.textContent = 'Listening...'; out.classList.remove('speech-correct','speech-incorrect'); }
+      if(micBtn) micBtn.textContent = '✅ Check';
+      const check = APP.querySelector('[data-action="check"]'); if(check) check.disabled = true;
       rec.onresult = ev => {
-        const heard = ev.results[0][0].transcript;
-        const target = ex.target || '';
-        const close = normalize(heard).includes(normalize(target).slice(0,4)) || normalize(target).includes(normalize(heard).slice(0,4));
-        if(out) out.textContent = `Heard: ${heard}`;
-        lessonSession.selected = close ? target : heard;
-        const btn = APP.querySelector('[data-action="check"]'); if(btn) btn.disabled = false;
+        let heard = '';
+        for(let i=0; i<ev.results.length; i++) heard += ' ' + ev.results[i][0].transcript;
+        heard = heard.trim();
+        lastSpeechHeard = heard;
+        lessonSession.selected = heard;
+        const correct = isSpeechMatch(heard, ex.target || '');
+        if(out){
+          out.textContent = `Heard: ${heard || '—'}`;
+          out.classList.toggle('speech-correct', correct);
+          out.classList.toggle('speech-incorrect', !!heard && !correct);
+        }
       };
-      rec.onerror = () => { if(out) out.textContent = 'Could not hear clearly. Try again or tap “I said it.”'; };
+      rec.onerror = () => { if(out){ out.textContent = 'Could not hear clearly. Listen again and try Speak.'; out.classList.add('speech-incorrect'); } };
+      rec.onend = () => { lessonSession.speechActive = false; if(micBtn) micBtn.textContent = '🎤 Speak'; const checkBtn = APP.querySelector('[data-action="check"]'); if(checkBtn && lastSpeechHeard) checkBtn.disabled = false; };
       rec.start();
     } catch(err){ toast('Microphone could not start.'); }
   }
@@ -1689,7 +1936,9 @@
     return String(str || '').toLowerCase().replace(/[।.?!,;:'"“”‘’\-]/g,'').replace(/\s+/g,' ').trim();
   }
   function getItemPunjabi(item){ return item?.gurmukhi || item?.pa || item?.text || item?.target || ''; }
-  function getEncouragement(){ return shuffle(['Shabash from Papa Ji!', 'Great focus.', 'You are getting stronger.', 'Chardi Kala energy!', 'Papa Ji is proud of your reading.'])[0]; }
+  function getCorrectFeedback(){ return shuffle(['Shabash from Papa Ji!', 'Chardi Kala energy!', 'Great focus.', 'You are getting stronger.', 'That Punjabi sounded powerful.', 'Excellent reading.', 'Papa Ji is proud of your effort.', 'You unlocked more Punjabi power.', 'Fantastic work, keep going.', 'That answer was strong and clear.', 'Waheguru gave you a sharp mind, keep practicing.', 'You remembered it well.'])[0]; }
+  function getIncorrectFeedback(){ return shuffle(['No worries. Mistakes help us learn.', 'Try again with calm focus.', 'Almost there. Listen once more and try again.', 'Papa Ji is here to help you fix it.', 'This one will come back in review.', 'Good effort. Let us make it stronger.', 'Take a breath and read the Gurmukhi again.', 'Every mistake builds Punjabi power.', 'You are learning, not failing.', 'Listen carefully and try the next one.', 'The answer is tricky, but you can handle it.', 'Keep going with Chardi Kala energy.'])[0]; }
+  function getEncouragement(){ return getCorrectFeedback(); }
 
   function confirmExitLesson(){
     createModal(`<h2>Leave lesson?</h2><p class="muted">Current lesson question progress will not be saved, but your completed lessons stay saved.</p><div class="button-row"><button class="btn danger" id="exitConfirm">Leave</button><button class="btn secondary" data-close-modal>Stay</button></div>`);
