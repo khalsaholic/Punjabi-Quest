@@ -1,4 +1,4 @@
-window.PUNJABI_QUEST_FIREBASE = {
+window.PQ_FIREBASE_CONFIG = {
   enabled: true,
 
   firebaseConfig: {
